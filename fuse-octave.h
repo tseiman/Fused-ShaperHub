@@ -13,7 +13,7 @@ static int open_callback(const char *path, struct fuse_file_info *fi);
 static int read_callback(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi);
 */
 
-int initFuse(int argc, char *argv[]);
+int oct_initFuse(int argc, char *argv[]);
 
 
 

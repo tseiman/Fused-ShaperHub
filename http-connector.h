@@ -1,3 +1,3 @@
 
 
-int getLocalAction(char *id, char **buffer);
+int oct_getLocalAction(char *id, char **buffer);

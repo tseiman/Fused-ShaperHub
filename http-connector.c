@@ -47,7 +47,7 @@ int checkPathLen(char *str) {
     return 0;
 }
 
-int getLocalAction(char *id, char **buffer) {
+int oct_getLocalAction(char *id, char **buffer) {
 
     CURL *curl;
     CURLcode res;
