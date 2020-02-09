@@ -190,7 +190,7 @@ int oct_walkFolders(WalkFolders_Callback_t callback, struct Oct_DirLoaderRef_s *
 
 
 
-    printf("json integer value: %d\n", (int)json_integer_value(result_json));
+//    DEBUG_LOG("json integer value: %d", (int)json_integer_value(result_json));
 /*
     if(!json_is_array(root)) {
 	fprintf(stderr, "error: data root is not an array\n");
@@ -239,7 +239,7 @@ int oct_getInfo(const char *path,struct Oct_ObjectStat_s *file_info) {
     result_json = getSubElementByNamedPath((char *) path, root);
 
     if(!result_json) {
-	ERR_LOG("getSubElementByNamedPath() retuned NULL");
+	WARN_LOG("getSubElementByNamedPath() retuned NULL, using path: %s", path);
 	return -2;
     }
 
@@ -259,7 +259,7 @@ int oct_getInfo(const char *path,struct Oct_ObjectStat_s *file_info) {
 //	file_info->onlinePath = (char *) json_string_value(onlinePath);
 	file_info->atime = json_integer_value(atime);
 	file_info->filesize = 0;
-    printf("---------- path: %s, type: %s\n",path, json_string_value(type));
+	DEBUG_LOG("path: %s, type: %s",path, json_string_value(type));
 	if(strcmp(json_string_value(type), "folder") == 0) {
 	    file_info->type = OCT_STAT_TYPE_FOLDER;
 	} else if (strcmp(json_string_value(type), "file") == 0) {
@@ -273,7 +273,6 @@ int oct_getInfo(const char *path,struct Oct_ObjectStat_s *file_info) {
 	    }
 	} else if (strcmp(json_string_value(type), "reference") == 0) {
 	    file_info->type = OCT_STAT_TYPE_REFERENCE;
-	    return -100;
 	} else {
 	    return -100;
 	}

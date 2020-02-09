@@ -22,6 +22,8 @@
 #include <stdlib.h>
 #include <curl/curl.h>
 
+#include "global.h"
+
 #define BASEURL "http://localhost:3000/"
 #define MAX_PATH_LEN 512
 
@@ -40,7 +42,7 @@ static size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, voi
   char *ptr = realloc(mem->memory, mem->size + realsize + 1);
   if(ptr == NULL) {
     /* out of memory! */ 
-    printf("not enough memory (realloc returned NULL)\n");
+    ERR_LOG("not enough memory (realloc returned NULL)");
     return 0;
   }
  
@@ -56,11 +58,11 @@ static size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, voi
 
 int checkPathLen(char *str) {
     if(strnlen(str,MAX_PATH_LEN - STRLEN(BASEURL)) < 1) {
-	fprintf(stderr, "Empty string given, cant proceed: %s\n", str);
+	ERR_LOG("Empty string given, cant proceed: %s", str);
 	return -1;
     }
     if(strnlen(str,MAX_PATH_LEN - STRLEN(BASEURL) + 10) > (MAX_PATH_LEN - STRLEN(BASEURL))) {
-	fprintf(stderr, "Too long path given, cant proceed: %s\n", str);
+	INFO_LOG("Too long path given, cant proceed: %s", str);
 	return -2;
     }
     return 0;
@@ -94,7 +96,7 @@ int oct_getLocalAction(char *id, char **buffer) {
 	res = curl_easy_perform(curl);
 	/* Check for errors */ 
 	if(res != CURLE_OK) {
-	    fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+	    ERR_LOG("curl_easy_perform() failed: %s", curl_easy_strerror(res));
 	    return res;
 	}
 	/* always cleanup */ 

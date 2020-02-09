@@ -21,6 +21,7 @@
 
 #include "data-container.h"
 #include "fuse-dataloader.h"
+#include "global.h"
 
 int oct_dirLoaderCallback(struct Oct_DirLoaderRef_s *ref) {
 
@@ -42,24 +43,27 @@ int oct_statForPath(const char *path, struct stat *stbuf) {
     struct Oct_ObjectStat_s file_info;
 
 
-    oct_getInfo(path, &file_info);
+    if(oct_getInfo(path, &file_info)) {
+        WARN_LOG("oct_getInfo() returned an error condition: %s",path);
+	return -1;
+    }
     switch(file_info.type) {
 	case OCT_STAT_TYPE_FOLDER:
-	    printf("------- FOLDER with name addded: %s\n",path);
+	    DEBUG_LOG("FOLDER with name addded: %s",path);
 	    stbuf->st_mode = S_IFDIR | 0755;
 	    stbuf->st_nlink = 1;
 	    stbuf->st_size = 4096;
 	    stbuf->st_atime = stbuf->st_mtime = stbuf->st_ctime = file_info.atime;
 	    break;
 	case OCT_STAT_TYPE_FILE:
-	    printf("------- FILE with name addded: %s\n",path);
+	    DEBUG_LOG("FILE with name addded: %s",path);
 	    stbuf->st_mode = S_IFREG | 0666;
 	    stbuf->st_nlink = 1;
 	    stbuf->st_size = file_info.filesize;
 	    stbuf->st_atime = stbuf->st_mtime = stbuf->st_ctime = file_info.atime;
 	    break;
 	case OCT_STAT_TYPE_REFERENCE:
-	    printf("------- LINK with name addded: %s\n",path);
+	    DEBUG_LOG("LINK with name addded: %s",path);
 	    stbuf->st_mode = S_IFLNK | 0777;
 	    stbuf->st_nlink = 1;
 	    stbuf->st_size = 4096;
@@ -68,13 +72,6 @@ int oct_statForPath(const char *path, struct stat *stbuf) {
 	default: return -1;
     }
 
-/*
-#define OCT_STAT_TYPE_FOLDER		0
-#define OCT_STAT_TYPE_FILE		1
-#define OCT_STAT_TYPE_REFERENCE 	2
-
-
-*/
     return 0;
 }
 
