@@ -4,7 +4,7 @@
  *
  * This file is part of the MountOctave Demonstrator Project
  *
- * header file for the HTTPS interface to the Octave cloud API service
+ * Some global macros and definitions go here
  *
  * License: Not Defined Yet
  *
@@ -13,5 +13,7 @@
  ************************************************************************** */
 
 
+// #define ERR_LOG(format,...) fprintf (stderr, "ERROR:%s:%d> " format "\n", __FILE__,__LINE__ ,## __VA_ARGS__)
+#define ERR_LOG(format, ...) fprintf (stderr, format, ## __VA_ARGS__)
 
-int oct_getLocalAction(char *id, char **buffer);
+

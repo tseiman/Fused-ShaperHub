@@ -1,3 +1,22 @@
+/* ***************************************************************************
+ *
+ * Thomas Schmidt, 2020
+ *
+ * This file is part of the MountOctave Demonstrator Project
+ *
+ * here the HTTPS interface to the Octave cloud service is implemted
+ * Informations come in via HTTPS from the OCtave Cloud API are handled here
+ * and forwarded to the data layer
+ * Vice versa the data layer might push information upstream to the 
+ * Octave API
+ *
+ * License: Not Defined Yet
+ *
+ * Project URL: https://github.com/tseiman/MountOctave 
+ *
+ ************************************************************************** */
+
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>

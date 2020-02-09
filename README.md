@@ -4,9 +4,16 @@ a proof of concept to mount Octave into local file system
 
 ## Dependencies
 
+* cmake
 * libjansson
 * libcurl
 * libfuse
+
+e.g. on Ubuntu:
+
+```
+sudo apt-get install cmake libjansson-dev libcurl4-openssl-dev libfuse-dev
+```
 
 ## Build
 

@@ -1,32 +1,58 @@
+/* ***************************************************************************
+ *
+ * Thomas Schmidt, 2020
+ *
+ * This file is part of the MountOctave Demonstrator Project
+ *
+ * The file contains the implementation for local data layer and storage
+ * for simplicity (and because it was already in use) the data managment 
+ * is implemented with JSON data.
+ * 
+ * License: Not Defined Yet
+ *
+ * Project URL: https://github.com/tseiman/MountOctave 
+ *
+ ************************************************************************** */
 
 #include <string.h>
 #include <jansson.h>
+#include <linux/limits.h>
 
 #include "data-container.h"
+#include "global.h"
 
 /* demo data structure */
 
 #define DATA_STRUCTURE \
-    "[\n"\
-	"{ \"type\": \"folder\", \"name\": \"Local_Action\", \"onlinepath\": \"local-action\", \"atime\": 1580428873, \"subnodes\": [\n"\
-	    "{\"type\": \"folder\", \"name\": \"actionOn_ObsLightValue\", \"atime\": 1580428873, \"subnodes\": [\n"\
-		"{\"type\": \"reference\", \"name\": \"recent\", \"reference\": 1, \"atime\": 1580428873, \"subnodes\": null},\n"\
-		"{\"type\": \"folder\", \"name\": \"v1\", \"version\": 1, \"atime\": 1580428873, \"subnodes\": [\n"\
-		    "{\"type\": \"file\", \"name\": \"actionOn_ObsLightValue\", \"atime\": 1580428873, \"subnodes\": null},\n"\
-		    "{\"type\": \"file\", \"name\": \".options\", \"atime\": 1580428873, \"subnodes\": null}\n"\
-		"]}\n"\
-	    "]}\n"\
-	" ]},\n"\
-	"{ \"type\": \"folder\", \"name\": \"Cloud_Action\", \"onlinepath\": \"action\", \"atime\": 1580428873, \"subnodes\": [\n"\
-	    "{\"type\": \"folder\", \"name\": \"TS_actionOn_ObsLightValueSuperCloudAction\", \"atime\": 1580428873, \"subnodes\": [\n"\
-		"{\"type\": \"reference\", \"name\": \"recent\", \"reference\": 1, \"atime\": 1580428873, \"subnodes\": null},\n"\
-		"{\"type\": \"folder\", \"name\": \"v1\", \"version\": 1, \"atime\": 1580428873, \"subnodes\": [\n"\
-		    "{\"type\": \"file\", \"name\": \"actionOn_ObsLightValue\", \"atime\": 1580428873, \"subnodes\": null},\n"\
-		    "{\"type\": \"file\", \"name\": \".options\", \"atime\": 1580428873, \"subnodes\": null}\n"\
-		"]}\n"\
-	    "]}\n"\
-	" ]}\n"\
-    "]\n"
+    "{\n"\
+	"\"Local_Action\" : { \"type\": \"folder\", \"onlinepath\": \"local-action\", \"atime\": 1580428000, \n"\
+	    "\"actionOn_ObsLightValue\": {\"type\": \"folder\", \"onlinepath\": \"actionOn_ObsLightValue\",  \"atime\": 1580428001, \n"\
+		"\"recent\": {\"type\": \"reference\", \"reference\": \"v1\", \"atime\": 1580428002 },\n"\
+		"\"v1\": {\"type\": \"folder\", \"version\": 1, \"atime\": 1580428003, \n"\
+		    "\"actionOn_ObsLightValue\" : {\"type\": \"file\", \"atime\": 1580428004, \"size\" : 123},\n"\
+		    "\".options\" : {\"type\": \"file\", \"atime\": 1580428005, \"size\" : 123}\n"\
+		"}\n"\
+	    "}\n"\
+	"},\n"\
+	"\"Cloud_Action\" : { \"type\": \"folder\", \"onlinepath\": \"cloud-action\", \"atime\": 1580428006, \n"\
+	    "\"TS_actionOn_ObsLightValueSuperCloudAction\": {\"type\": \"folder\", \"onlinepath\": \"TS_actionOn_ObsLightValueSuperCloudAction\",  \"atime\": 1580428007, \n"\
+		"\"recent\": {\"type\": \"reference\", \"reference\": \"v2\", \"atime\": 1580428009 },\n"\
+		"\"v1\": {\"type\": \"folder\", \"version\": 1, \"atime\": 1580428010, \n"\
+		    "\"TS_actionOn_ObsLightValueSuperCloudAction\" : {\"type\": \"file\", \"atime\": 1580428011, \"size\" : 123},\n"\
+		    "\".options\" : {\"type\": \"file\", \"atime\": 1580428012, \"size\" : 123 }\n"\
+		"},\n"\
+		"\"v2\": {\"type\": \"folder\", \"version\": 2, \"atime\": 1580428013, \n"\
+		    "\"TS_actionOn_ObsLightValueSuperCloudAction\" : {\"type\": \"file\", \"atime\": 1580428014, \"size\" : 123 },\n"\
+		    "\".options\" : {\"type\": \"file\", \"atime\": 1580428015, \"size\" : 123 }\n"\
+		"}\n"\
+	    "}\n"\
+	"}\n"\
+    "}\n"
+
+
+
+
+
 
 
 json_t *setGetRoot(json_t * newRoot) {
@@ -45,7 +71,7 @@ int oct_setupDataStructure() {
     root = json_loads(DATA_STRUCTURE, 0, &error);
 
     if(!root) {
-	fprintf(stderr, "error: on line %d: %s\n", error.line, error.text);
+	ERR_LOG("when loading JSON line:%d  error:%s ", error.line, error.text);
 	return 1;
     }
     setGetRoot(root);
@@ -54,23 +80,127 @@ int oct_setupDataStructure() {
 }
 
 
-// int oct_walkFolders(int (*callback)(struct Oct_DirLoaderRef_s *ref), void *ref) {
+json_t *getSubElementByNamedPath(char *path, json_t *rootElement) {
+    unsigned int delimiterPos = 0;
+    char *tmpPath = strndup(path,PATH_MAX);
+    char *tmpPath_P = tmpPath;
+    char *tmpPath_StrChr_P;
+    json_t *result_json;
+    json_t *tmp_json;
+
+
+    if(!rootElement) {
+	ERR_LOG("can't walk through folders if data is not loaded");
+	return (json_t *) -1;
+    }
+
+//    delimiterPos = (unsigned int) (strchr(tmpPath_P, '/') - tmpPath_P);
+    tmpPath_StrChr_P = strchr(tmpPath_P, '/');
+    delimiterPos = (unsigned int) (tmpPath_StrChr_P - tmpPath_P);
+
+
+    if((tmpPath_StrChr_P == tmpPath_P) && (strnlen(tmpPath_P,PATH_MAX) >1)) {
+	++tmpPath_P;
+	tmpPath_StrChr_P = strchr(tmpPath_P, '/');
+	delimiterPos = (unsigned int) (tmpPath_StrChr_P - tmpPath_P);
+    }
+    if(tmpPath_StrChr_P != NULL) {
+	tmpPath_P[delimiterPos] = '\0';
+    }
+
+// printf("-------- tmpPath: %s, %lx, %lx\n", tmpPath_P, (unsigned long)(tmpPath_P + delimiterPos + 1), (unsigned long)(tmpPath_P + strnlen(path, PATH_MAX)));
+
+    tmp_json = json_object_get(rootElement,tmpPath_P);
+    result_json = tmp_json;
+
+
+    if(((tmpPath_P + delimiterPos + 1) < (tmpPath_P + strnlen(path, PATH_MAX))) && tmp_json) {
+// printf("-------- going to recursion\n");
+	tmp_json = getSubElementByNamedPath(tmpPath_P + delimiterPos + 1,tmp_json);
+    }
+    if(tmp_json) {
+	result_json = tmp_json;
+    }
+
+    
+//    result_json = json_object_get();
+    free(tmpPath);
+    return result_json;
+
+}
+
+
 int oct_walkFolders(WalkFolders_Callback_t callback, struct Oct_DirLoaderRef_s *ref) {
 
-    unsigned int i;
+//    unsigned int i;
     json_t *root = setGetRoot(NULL);
+    json_t *result_json;
+
+
     
     if(!root) {
-	fprintf(stderr, "error: cant walk through folders if data is not loaded\n");
+	ERR_LOG("can't walk through folders if data is not loaded");
 	return -1;
     }
 
+//    result_json = getSubElementByNamedPath("/Cloud_Action/TS_actionOn_ObsLightValueSuperCloudAction/v2", root);
+//    result_json = getSubElementByNamedPath("/Local_Action/actionOn_ObsLightValue/v1", root);
+//    result_json = getSubElementByNamedPath("/", root);
+
+
+    result_json = (strcmp(ref->path, "/") == 0) ? root :  getSubElementByNamedPath((char *) ref->path, root);
+
+    if(!result_json) {
+	ERR_LOG("getSubElementByNamedPath() retuned NULL");
+	return -2;
+    }
+
+    if(!json_is_object(result_json)) {
+	ERR_LOG("commit data is not an objec");
+        return -3;
+    }
+
+    void *iter = json_object_iter(result_json);
+    while(iter) {
+	const char *key = json_object_iter_key(iter);
+	json_t *value = json_object_iter_value(iter);
+
+
+	if(value && json_is_object(value)) {
+//	    json_t *type = json_object_get(value, "type");
+
+
+
+//	    if(type && json_is_string(type) && (strcmp(json_string_value(type), "folder") == 0)) {
+
+// printf("-------- going to load33 %s \n", key);
+
+		ref->filename = key;
+		callback(ref);
+//	    }
+	    
+	}
+
+	iter = json_object_iter_next(result_json, iter);
+    } /* END looping trough all elements of this level */
+
+
+
+    result_json = json_object_get(result_json, "atime");
+
+
+
+    printf("json integer value: %d\n", (int)json_integer_value(result_json));
+/*
     if(!json_is_array(root)) {
 	fprintf(stderr, "error: data root is not an array\n");
 //	json_decref(root);
 	return -2;
     }
+*/
 
+
+/*
     for(i = 0; i < json_array_size(root); i++) {
 	json_t *data, *type, *dir_name;
 
@@ -92,7 +222,96 @@ int oct_walkFolders(WalkFolders_Callback_t callback, struct Oct_DirLoaderRef_s *
 	    }
 
 	} 
+    } */
+    return 0;
+}
+
+int oct_getInfo(const char *path,struct Oct_ObjectStat_s *file_info) {
+    json_t *root = setGetRoot(NULL);
+    json_t *result_json;
+
+
+    if(!root) {
+	ERR_LOG("can't get Info if data is not loaded");
+	return -1;
     }
+
+    result_json = getSubElementByNamedPath((char *) path, root);
+
+    if(!result_json) {
+	ERR_LOG("getSubElementByNamedPath() retuned NULL");
+	return -2;
+    }
+
+    if(!json_is_object(result_json)) {
+	ERR_LOG("commit data is not an object");
+        return -3;
+    }
+    
+    json_t *type = json_object_get(result_json, "type");
+//    json_t *onlinePath = json_object_get(result_json, "onlinePath");
+    json_t *atime = json_object_get(result_json, "atime");
+
+//  && onlinePath && json_is_string(onlinePath)
+
+    if(type && json_is_string(type) && atime && json_is_integer(atime)) {
+
+//	file_info->onlinePath = (char *) json_string_value(onlinePath);
+	file_info->atime = json_integer_value(atime);
+	file_info->filesize = 0;
+    printf("---------- path: %s, type: %s\n",path, json_string_value(type));
+	if(strcmp(json_string_value(type), "folder") == 0) {
+	    file_info->type = OCT_STAT_TYPE_FOLDER;
+	} else if (strcmp(json_string_value(type), "file") == 0) {
+	    json_t *filesize = json_object_get(result_json, "size");
+	    if(filesize && json_is_integer(filesize)) {
+		file_info->type = OCT_STAT_TYPE_FILE;
+		file_info->filesize = json_integer_value(filesize);
+	    } else {
+		ERR_LOG("File object did not contain size information");
+		return -101;
+	    }
+	} else if (strcmp(json_string_value(type), "reference") == 0) {
+	    file_info->type = OCT_STAT_TYPE_REFERENCE;
+	    return -100;
+	} else {
+	    return -100;
+	}
+
+    }
+
+    return 0;
+}
+
+
+int oct_getLinkInfo(const char *path, char * linkDstPath, size_t size) { 
+    json_t *root = setGetRoot(NULL);
+    json_t *result_json;
+
+
+    if(!root) {
+	ERR_LOG("can't get Info if data is not loaded");
+	return -1;
+    }
+
+    result_json = getSubElementByNamedPath((char *) path, root);
+
+    if(!result_json) {
+	ERR_LOG("getSubElementByNamedPath() retuned NULL");
+	return -2;
+    }
+
+    if(!json_is_object(result_json)) {
+	ERR_LOG("commit data is not an object");
+        return -3;
+    }
+    
+    json_t *reference = json_object_get(result_json, "reference");
+
+    if(reference && json_is_string(reference)) {
+	strncpy(linkDstPath,json_string_value(reference) ,size);
+    }
+    
     return 0;
 }
 
