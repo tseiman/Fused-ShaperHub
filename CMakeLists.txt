@@ -13,6 +13,14 @@ find_package(FUSE REQUIRED)
 find_package(CURL REQUIRED)
 find_package(Jansson REQUIRED)
 
+
+OPTION(IS_MOC "This enables a mocup build - filling the FUSE FS with demo folders and files" OFF)
+
+IF(IS_MOC)
+    ADD_DEFINITIONS(-DIS_MOC)
+ENDIF(IS_MOC)
+
 include_directories(${FUSE_INCLUDE_DIR} ${CURL_INCLUDE_DIR} ${JANSSON_INCLUDE_DIR})
 add_executable(mount-octave fuse-octave.c fuse-dataloader.c http-connector.c json-handler.c data-container.c config.c main.c)
 target_link_libraries(mount-octave ${FUSE_LIBRARIES} ${CURL_LIBRARIES} ${JANSSON_LIBRARIES})
+

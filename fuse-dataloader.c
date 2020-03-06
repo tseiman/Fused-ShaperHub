@@ -18,10 +18,18 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <errno.h>
 
 #include "data-container.h"
 #include "fuse-dataloader.h"
 #include "global.h"
+
+#ifdef IS_MOC
+#include "MOCFILE.h"
+
+MOC_DEMO_FILES;
+
+#endif
 
 int oct_dirLoaderCallback(struct Oct_DirLoaderRef_s *ref) {
 
@@ -34,6 +42,48 @@ int oct_dirLoader(struct Oct_DirLoaderRef_s *ref) {
 
 
     return oct_walkFolders(oct_dirLoaderCallback, ref);
+
+}
+
+
+int oct_FileLoader(const char *path, char *buf, size_t size, off_t offset) {
+    DEBUG_LOG("READ data chunk with size %d at offet %ld file: %s", (int)size, offset, path);
+
+
+    if (strcmp(path, filepath) == 0) {
+	size_t len = strlen(filecontent);
+	if (offset >= len) {
+    	    return 0;
+	}
+
+	if (offset + size > len) {
+    	    memcpy(buf, filecontent + offset, len - offset);
+    	    return len - offset;
+	}
+
+	memcpy(buf, filecontent + offset, size);
+	return size;
+    }
+
+
+
+    if (strcmp(path, filepath1) == 0) {
+	size_t len = strlen(filecontent1);
+	if (offset >= len) {
+    	    return 0;
+	}
+
+	if (offset + size > len) {
+    	    memcpy(buf, filecontent1 + offset, len - offset);
+    	    return len - offset;
+	}
+
+	memcpy(buf, filecontent1 + offset, size);
+	return size;
+    }
+
+
+    return -ENOENT;
 
 }
 

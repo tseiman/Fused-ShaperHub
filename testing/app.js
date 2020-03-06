@@ -1,3 +1,10 @@
+/*
+ * 
+ * This is a NodeJS bases server to mimic OCtave API
+ *
+ *
+ */ 
+
 const http = require('http');
 const fs = require('fs');
 

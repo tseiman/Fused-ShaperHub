@@ -9,7 +9,7 @@ a proof of concept to mount Octave into local file system
 * libcurl
 * libfuse
 
-e.g. on Ubuntu:
+e.g. on Ubuntu (tested with 18.04 LTS):
 
 ```
 sudo apt-get install cmake libjansson-dev libcurl4-openssl-dev libfuse-dev
@@ -18,7 +18,9 @@ sudo apt-get install cmake libjansson-dev libcurl4-openssl-dev libfuse-dev
 ## Build
 
 ```
-cmake -DCMAKE_BUILD_TYPE=Debug .
+git clone https://github.com/tseiman/MountOctave.git
+cd MountOctave
+cmake -DCMAKE_BUILD_TYPE=Debug -DIS_MOC=ON .
 make
 
 ```
@@ -26,7 +28,7 @@ make
 ## Run
 ```
 mkdir testdir
-./bin/mount-octave -d  -f testdir/
+./bin/mount-octave -f testdir/
 
 ```
 Check content of testdir

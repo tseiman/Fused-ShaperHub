@@ -44,6 +44,7 @@ struct Oct_ObjectStat_s {
 int oct_dirLoader(struct Oct_DirLoaderRef_s *ref);
 int oct_statForPath(const char *path, struct stat *stbuf);
 int oct_LinkInfo(const char *path, char * linkDstPath, size_t size);
+int oct_FileLoader(const char *path, char *buf, size_t size, off_t offset);
 
 
 #endif

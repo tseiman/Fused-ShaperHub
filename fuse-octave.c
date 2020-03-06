@@ -25,19 +25,11 @@
 #include "fuse-octave.h"
 #include "fuse-dataloader.h"
 
-static const char *filepath = "/file";
-// static const char *filename = "file";
-static const char *filecontent = "I'm the content of the only file available there\n";
 
-
- static const char *filepath1 = "/sub/file1";
-// static const char *filename1 = "file1";
-static const char *filecontent1 = "I'm the content of the only file1 available there\n";
-
- static const char *filepath2 = "/sub/file2";
-// static const char *filename2 = "file2";
-static const char *filecontent2 = "I'm the content of the only file2 available there\n";
-
+#ifdef IS_MOC
+#include "MOCFILE.h"
+MOC_DEMO_FILES;
+#endif
 
 static int getattr_callback(const char *path, struct stat *stbuf) {
     memset(stbuf, 0, sizeof(struct stat));
@@ -50,7 +42,12 @@ static int getattr_callback(const char *path, struct stat *stbuf) {
     }
 
 
-    if(!oct_statForPath(path,stbuf)) return 0;
+    if(!oct_statForPath(path,stbuf)) {
+#ifdef MOCFILES_ATTR
+	MOCFILES_ATTR;  // this brings in for some hardcoded "files" for mockup 
+#endif
+	return 0;
+    } 
 
 
 
@@ -87,6 +84,11 @@ static int open_callback(const char *path, struct fuse_file_info *fi) {
 
 static int read_callback(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
 
+
+//    return oct_FileLoader(path,buf,size,offset);
+
+
+
   if (strcmp(path, filepath) == 0) {
     size_t len = strlen(filecontent);
     if (offset >= len) {
@@ -119,24 +121,11 @@ static int read_callback(const char *path, char *buf, size_t size, off_t offset,
     return size;
   }
 
-  if (strcmp(path, filepath2) == 0) {
-    size_t len = strlen(filecontent2);
-    if (offset >= len) {
-      return 0;
-    }
-
-    if (offset + size > len) {
-      memcpy(buf, filecontent2 + offset, len - offset);
-      return len - offset;
-    }
-
-    memcpy(buf, filecontent2 + offset, size);
-    return size;
-  }
-
 
 
   return -ENOENT;
+
+
 }
 
 
