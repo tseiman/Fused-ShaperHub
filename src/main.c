@@ -23,7 +23,7 @@
 #include <errno.h>
 
 
-#include "fuse-octave.h"
+#include "fused-shaperhub.h"
 #include "http-connector.h"
 #include "data-container.h"
 
@@ -34,8 +34,8 @@ int main(int argc, char *argv[]) {
 //    printf("My HTTP data:\n%s\n",httpdata);
 //    free(httpdata);
 
-    oct_setupDataStructure();
-    oct_initFuse(argc, argv);
+    fsh_setupDataStructure();
+    fsh_initFuse(argc, argv);
 
 
     return 0;

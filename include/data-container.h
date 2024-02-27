@@ -21,8 +21,8 @@ typedef int (*WalkFolders_Callback_t)(struct Oct_DirLoaderRef_s *ref);
 
 
 
-int oct_setupDataStructure(void);
-int oct_walkFolders(WalkFolders_Callback_t callback, struct Oct_DirLoaderRef_s *ref);
-int oct_getInfo(const char *path,struct Oct_ObjectStat_s *file_info);
-int oct_getLinkInfo(const char *path, char * linkDstPath, size_t size);
+int fsh_setupDataStructure(void);
+int fsh_walkFolders(WalkFolders_Callback_t callback, struct Oct_DirLoaderRef_s *ref);
+int fsh_getInfo(const char *path,struct Oct_ObjectStat_s *file_info);
+int fsh_getLinkInfo(const char *path, char * linkDstPath, size_t size);
 
