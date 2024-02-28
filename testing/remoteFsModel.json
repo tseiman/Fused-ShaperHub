@@ -29,7 +29,7 @@
             "filesystemType": "userspace",
             "owner": "10000000000000000000000a",
             "path": "/",
-            "name": "Some Folder With whitespace Shared",
+            "name": "Some Folder With whitespaceShared",
             "type": "folder",
             "deleted": false,
             "shareID": "0123456789abcdef01234560",

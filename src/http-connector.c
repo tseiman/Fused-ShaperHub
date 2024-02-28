@@ -116,7 +116,7 @@ int fsh_HTTPListPath(char *path, MemoryStruct_t **responseBuffer) {
     /* Check for errors */
     if (res != CURLE_OK) {
         LOG_ERR("curl_easy_perform() failed: %s", curl_easy_strerror(res));
-        return res;
+        goto ERROR;
     }
     /* always cleanup */
     curl_easy_cleanup(curl);
@@ -127,10 +127,11 @@ int fsh_HTTPListPath(char *path, MemoryStruct_t **responseBuffer) {
     
     goto EXIT;
 ERROR:
-    if(!chunk) FREE(chunk);
-    chunk = NULL;
 EXIT:
-    if(!pathbuffer) FREE(pathbuffer);
+//    if(chunk) FREE(chunk);
+ //   chunk = NULL;
+
+    if(pathbuffer) FREE(pathbuffer);
     pathbuffer = NULL; 
     
     curl_global_cleanup();
