@@ -8,7 +8,7 @@
  *
  * License: Not Defined Yet
  *
- * Project URL: https://github.com/tseiman/MountOctave 
+ * Project URL: https://github.com/tseiman/Fused-ShaperHub 
  *
  ************************************************************************** */
 
@@ -17,6 +17,9 @@
 #include <errno.h>
 
 
-int oct_initFuse(int argc, char *argv[]);
+typedef void (*showHelp_f)(const char *progname);
+
+
+int fsh_initFuse(int argc, char *argv[],showHelp_f showHelp);
 
 

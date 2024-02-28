@@ -10,19 +10,26 @@
  * 
  * License: Not Defined Yet
  *
- * Project URL: https://github.com/tseiman/MountOctave 
+ * Project URL: https://github.com/tseiman/Fused-ShaperHub
  *
  ************************************************************************** */
 
-#include "fuse-dataloader.h"
 
-typedef int (*WalkFolders_Callback_t)(struct Oct_DirLoaderRef_s *ref);
-
+#include <jansson.h>
 
 
+#include <fuse-dataloader.h>
 
-int fsh_setupDataStructure(void);
-int fsh_walkFolders(WalkFolders_Callback_t callback, struct Oct_DirLoaderRef_s *ref);
-int fsh_getInfo(const char *path,struct Oct_ObjectStat_s *file_info);
+typedef int (*WalkFolders_Callback_t)(struct Fsh_DirLoaderRef_s *ref);
+
+
+typedef struct {
+    json_t *jsonObjectRoot;
+    char   *path;
+} PathInfo_t; 
+
+// int fsh_setupDataStructure(void);
+int fsh_walkFolders(WalkFolders_Callback_t callback, struct Fsh_DirLoaderRef_s *ref);
+int fsh_getInfo(const char *path,struct Fsh_ObjectStat_s *file_info);
 int fsh_getLinkInfo(const char *path, char * linkDstPath, size_t size);
 

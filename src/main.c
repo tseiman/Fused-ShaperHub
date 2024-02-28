@@ -11,7 +11,7 @@
  *
  * License: Not Defined Yet
  *
- * Project URL: https://github.com/tseiman/MountOctave 
+ * Project URL: https://github.com/tseiman/Fused-ShaperHub
  *
  ************************************************************************** */
 
@@ -22,20 +22,27 @@
 #include <stdlib.h>
 #include <errno.h>
 
+#include <fused-shaperhub.h>
+#include <messages.h>
+#include <http-connector.h>
+#include <data-container.h>
 
-#include "fused-shaperhub.h"
-#include "http-connector.h"
-#include "data-container.h"
+
+int verbosity = 0;
 
 
-int main(int argc, char *argv[]) {
-//    char *httpdata = NULL;
-//    getLocalAction("l5e336e4950f068603b5e6e2f.json", &httpdata);
-//    printf("My HTTP data:\n%s\n",httpdata);
-//    free(httpdata);
+static void show_help(const char *progname) {
+	printf("usage: %s [options] <mountpoint>\n\n", progname);
+	printf("File-system specific options:\n"
+	       "    -v=<n>              0-4 Debug Level\n"
+	       "\n");
+}
 
-    fsh_setupDataStructure();
-    fsh_initFuse(argc, argv);
+
+
+int main(int argc, char **argv) {
+
+    fsh_initFuse(argc, argv, &show_help);
 
 
     return 0;

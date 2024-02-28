@@ -12,22 +12,25 @@ project(
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_FILE_OFFSET_BITS=64")
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} \
--std=c99 \
+-D_FILE_OFFSET_BITS=64 \
 -D_FORTIFY_SOURCE=2  \
 -D_GLIBCXX_ASSERTIONS  \
 -O2 \
 -fasynchronous-unwind-tables  \
 -fexceptions  \
--fpie  \
--pie -fpic \
--shared  \
--fstack-clash-protection  \
--fstack-protector-all  \
--fstack-protector-strong  \
--pipe \
--Werror=format-security \
--z defs -z now -z relro \
--Wall ")
+")
+
+#-fpie  \
+#-pie -fpic \
+#-shared  \
+#-fstack-clash-protection  \
+#-fstack-protector-all  \
+#-fstack-protector-strong  \
+#-pipe \
+#-Werror=format-security \
+#-z defs -z now -z relro \
+#-Wall 
+
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake" ${CMAKE_MODULE_PATH})
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -46,9 +49,9 @@ set(SOURCES
     src/fused-shaperhub.c
     src/fuse-dataloader.c
     src/http-connector.c
-    src/json-handler.c
     src/data-container.c
     src/config.c
+    src/alloc.c
     src/main.c
 )
 add_executable(fused-shaperhub ${SOURCES})
@@ -67,4 +70,3 @@ target_link_libraries(fused-shaperhub ${CURL_LIBRARIES})
 
 include_directories(include)
 
-target_link_libraries(fused-shaperhub ${FUSE_LIBRARIES} ${CURL_LIBRARIES} ${JANSSON_LIBRARIES})

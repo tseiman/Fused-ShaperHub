@@ -8,10 +8,20 @@
  *
  * License: Not Defined Yet
  *
- * Project URL: https://github.com/tseiman/MountOctave 
+ * Project URL: https://github.com/tseiman/Fused-ShaperHub
  *
  ************************************************************************** */
 
 
+#ifndef HAVE_HTTP_CONNECTOR_H
+#define HAVE_HTTP_CONNECTOR_H
 
-int oct_getLocalAction(char *id, char **buffer);
+typedef struct  {
+  char *memory;
+  size_t size;
+} MemoryStruct_t;
+
+
+int fsh_HTTPListPath(char *path, MemoryStruct_t **responseBuffer);
+
+#endif

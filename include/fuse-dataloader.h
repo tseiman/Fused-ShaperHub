@@ -11,7 +11,7 @@
  *
  * License: Not Defined Yet
  *
- * Project URL: https://github.com/tseiman/MountOctave 
+ * Project URL: https://github.com/tseiman/Fused-ShaperHub
  *
  ************************************************************************** */
 
@@ -20,7 +20,7 @@
 #ifndef HAVE_FUSE_DATALOADER
 #define HAVE_FUSE_DATALOADER
 
-struct Oct_DirLoaderRef_s {
+struct Fsh_DirLoaderRef_s {
     const char *path;
     void *buf;
     fuse_fill_dir_t filler;
@@ -28,23 +28,23 @@ struct Oct_DirLoaderRef_s {
 };
 
 
-#define OCT_STAT_TYPE_FOLDER		0
-#define OCT_STAT_TYPE_FILE		1
-#define OCT_STAT_TYPE_REFERENCE 	2
+#define FSH_STAT_TYPE_FOLDER		0
+#define FSH_STAT_TYPE_FILE		1
+// #define FSH_STAT_TYPE_REFERENCE 	2
 
 
-struct Oct_ObjectStat_s {
+struct Fsh_ObjectStat_s {
     int type;
-    char *onlinePath;
+//    char *onlinePath;
     unsigned int atime;
     unsigned int filesize;
 };
 
 
-int oct_dirLoader(struct Oct_DirLoaderRef_s *ref);
-int oct_statForPath(const char *path, struct stat *stbuf);
-int oct_LinkInfo(const char *path, char * linkDstPath, size_t size);
-int oct_FileLoader(const char *path, char *buf, size_t size, off_t offset);
+int fsh_dirLoader(struct Fsh_DirLoaderRef_s *ref);
+int fsh_statForPath(const char *path, struct stat *stbuf);
+int fsh_LinkInfo(const char *path, char * linkDstPath, size_t size);
+int fsh_FileLoader(const char *path, char *buf, size_t size, off_t offset);
 
 
 #endif

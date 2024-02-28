@@ -1,3 +1,9 @@
 {
-    "cmake.configureOnOpen": true
+    "cmake.configureOnOpen": true,
+    "files.associations": {
+        "fused-shaperhub.h": "c",
+        "fuse-dataloader.h": "c",
+        "messages.h": "c",
+        "http-connector.h": "c"
+    }
 }

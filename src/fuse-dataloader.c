@@ -11,7 +11,7 @@
  *
  * License: Not Defined Yet
  *
- * Project URL: https://github.com/tseiman/MountOctave 
+ * Project URL: https://github.com/tseiman/Fused-ShaperHub 
  *
  ************************************************************************** */
 
@@ -20,9 +20,10 @@
 #include <stdio.h>
 #include <errno.h>
 
-#include "data-container.h"
-#include "fuse-dataloader.h"
-#include "global.h"
+
+#include <data-container.h>
+#include <fuse-dataloader.h>
+#include <messages.h>
 
 #ifdef IS_MOC
 #include "MOCFILE.h"
@@ -31,24 +32,24 @@ MOC_DEMO_FILES;
 
 #endif
 
-int oct_dirLoaderCallback(struct Oct_DirLoaderRef_s *ref) {
+int fsh_dirLoaderCallback(struct Fsh_DirLoaderRef_s *ref) {
 
     ref->filler(ref->buf, ref->filename, NULL, 0);
 
     return 0;
 }
 
-int oct_dirLoader(struct Oct_DirLoaderRef_s *ref) {
+int fsh_dirLoader(struct Fsh_DirLoaderRef_s *ref) {
 
 
-    return oct_walkFolders(oct_dirLoaderCallback, ref);
+    return fsh_walkFolders(fsh_dirLoaderCallback, ref);
 
 }
 
 
-int oct_FileLoader(const char *path, char *buf, size_t size, off_t offset) {
-    DEBUG_LOG("READ data chunk with size %d at offet %ld file: %s", (int)size, offset, path);
-
+int fsh_FileLoader(const char *path, char *buf, size_t size, off_t offset) {
+    LOG_DEBUG("READ data chunk with size %d at offet %ld file: %s", (int)size, offset, path);
+/*
 
     if (strcmp(path, filepath) == 0) {
 	size_t len = strlen(filecontent);
@@ -81,7 +82,7 @@ int oct_FileLoader(const char *path, char *buf, size_t size, off_t offset) {
 	memcpy(buf, filecontent1 + offset, size);
 	return size;
     }
-
+*/
 
     return -ENOENT;
 
@@ -89,43 +90,45 @@ int oct_FileLoader(const char *path, char *buf, size_t size, off_t offset) {
 
 
 
-int oct_statForPath(const char *path, struct stat *stbuf) {
-    struct Oct_ObjectStat_s file_info;
+int fsh_statForPath(const char *path, struct stat *stbuf) {
+    struct Fsh_ObjectStat_s file_info;
 
+	LOG_DEBUG("fsh_statForPath( %s)", path);
 
-    if(oct_getInfo(path, &file_info)) {
-        WARN_LOG("oct_getInfo() returned an error condition: %s",path);
-	return -1;
+    if(fsh_getInfo(path, &file_info)) {
+        LOG_WARN("fsh_getInfo() returned an error condition: %s",path);
+		return -1;
     }
+LOG_DEBUG("fsh_statForPath( %s)", path);
     switch(file_info.type) {
-	case OCT_STAT_TYPE_FOLDER:
-	    DEBUG_LOG("FOLDER with name addded: %s",path);
+	case FSH_STAT_TYPE_FOLDER:
+	    LOG_DEBUG("FOLDER with name addded: %s",path);
 	    stbuf->st_mode = S_IFDIR | 0755;
 	    stbuf->st_nlink = 1;
 	    stbuf->st_size = 4096;
 	    stbuf->st_atime = stbuf->st_mtime = stbuf->st_ctime = file_info.atime;
 	    break;
-	case OCT_STAT_TYPE_FILE:
-	    DEBUG_LOG("FILE with name addded: %s",path);
+	case FSH_STAT_TYPE_FILE:
+	    LOG_DEBUG("FILE with name addded: %s",path);
 	    stbuf->st_mode = S_IFREG | 0666;
 	    stbuf->st_nlink = 1;
 	    stbuf->st_size = file_info.filesize;
 	    stbuf->st_atime = stbuf->st_mtime = stbuf->st_ctime = file_info.atime;
 	    break;
-	case OCT_STAT_TYPE_REFERENCE:
-	    DEBUG_LOG("LINK with name addded: %s",path);
+/*	case FSH_STAT_TYPE_REFERENCE:
+	    LOG_DEBUG("LINK with name addded: %s",path);
 	    stbuf->st_mode = S_IFLNK | 0777;
 	    stbuf->st_nlink = 1;
 	    stbuf->st_size = 4096;
 	    stbuf->st_atime = stbuf->st_mtime = stbuf->st_ctime = file_info.atime;
-	    break;
+	    break; */
 	default: return -1;
     }
 
     return 0;
 }
 
-int oct_LinkInfo(const char *path, char * linkDstPath, size_t size) {
-    return oct_getLinkInfo(path,linkDstPath, size);
+int fsh_LinkInfo(const char *path, char * linkDstPath, size_t size) {
+    return fsh_getLinkInfo(path,linkDstPath, size);
 }
 
