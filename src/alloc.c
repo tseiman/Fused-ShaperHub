@@ -18,33 +18,36 @@
 
 #include "messages.h"
 
-int alloc_counter;
+static int alloc_counter;
 
 
-void *gcp_malloc(size_t size, char* caller, unsigned int line ) {
+void *gcp_malloc(const char *funcName, size_t size, char* caller, unsigned int line ) {
     void *pointer = NULL;
     ++alloc_counter; 
     if(! (pointer = malloc(size))) { 
-        LOG_MEM_ERR("was not able to allocate %ld bytes, failed. \t(%s:%d)" , (long int) size, caller, line);
-    } else MEM_DBG("Allocated %ld bytes at %p, %d different memory segments for different allocations allocated. \t(%s:%d)", (long int) size, pointer, alloc_counter, caller, line);
+        LOG_MEM_ERR("%s(): was not able to allocate %ld bytes, failed. \t(%s:%d)", funcName, (long int) size, caller, line);
+    } else MEM_DBG("%s(): Allocated %ld bytes at %p, %d different memory segments for different allocations allocated. \t(%s:%d)", funcName, (long int) size, pointer, alloc_counter, caller, line);
     return pointer;
 }
 
-void *gcp_realloc(void *p, size_t size, char* caller, unsigned int line ) {
+void *gcp_realloc(const char *funcName, void *p, size_t size, char* caller, unsigned int line ) {
     void  *pointer = NULL; 
     if(!p) ++alloc_counter; 
     if(! (pointer = realloc(p, size))) { 
-        LOG_MEM_ERR("was not able to re-allocate %ld bytes, failed. \t(%s:%d)", (long int) size, caller, line); 
-    } else MEM_DBG("(Re-)Allocated %ld bytes at %p, %d different memory segments for different allocations allocated. \t(%s:%d)", (long int) size, pointer, alloc_counter, caller, line); 
+        LOG_MEM_ERR("%s(): was not able to re-allocate %ld bytes, failed. \t(%s:%d)", funcName, (long int) size, caller, line); 
+    } else MEM_DBG("%s(): (Re-)Allocated %ld bytes at %p, %d different memory segments for different allocations allocated. \t(%s:%d)", funcName, (long int) size, pointer, alloc_counter, caller, line); 
     return pointer;
 }
 
-void gcp_free(void *p, char* caller, unsigned int line ) { 
+void gcp_free(const char *funcName, void *p, char* caller, unsigned int line ) { 
     if(p) { 
         --alloc_counter; 
         free(p); 
-        MEM_DBG("Freeing at %p, still to free %d.  \t(%s:%d)",p, alloc_counter, caller, line); 
+        MEM_DBG("%s(): Freeing at %p, still to free %d.  \t(%s:%d)", funcName, p, alloc_counter, caller, line); 
         p = NULL; 
     }
 }
 
+int getAlloCounter() {
+    return alloc_counter;
+}

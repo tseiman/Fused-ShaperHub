@@ -17,7 +17,13 @@
 #include <jansson.h>
 #include <linux/limits.h>
 #include <string.h>
-#include <strings.h>
+#include <libgen.h>
+
+// the defines are needed to get strptime()
+#define __USE_XOPEN  
+#define _GNU_SOURCE
+#include <time.h>
+
 
 #include <alloc.h>
 #include <data-container.h>
@@ -25,33 +31,42 @@
 #include <http-connector.h>
 #include <messages.h>
 
+static PathInfo_t pathInfo = {NULL, NULL};
+
+int comparePathLevel(char *a, char *b) {
+    int i,j = 0;
+    for (i=0; a[i]; a[i]=='/' ? i++ : *a++);
+    for (j=0; b[j]; b[j]=='/' ? j++ : *b++);
+
+    return i - j;
+
+}
+
 PathInfo_t *updatePathInfo(const char *path) {
-    static PathInfo_t pathInfo = {NULL, NULL};
+    
     MemoryStruct_t *httpResponseBuffer = NULL;
     json_error_t error;
     PathInfo_t *result = NULL;
 
-    LOG_DEBUG("updatePathInfo( %s ) ", path);
+    LOG_DEBUG("Entry with path >%s< ", path);
 
     if ((!path) && pathInfo.jsonObjectRoot && pathInfo.path)
         return &pathInfo; // if path is NULL but we've some info stored we return that
 
     if (pathInfo.jsonObjectRoot && pathInfo.path) {
         if (strncmp(path, pathInfo.path, MAX_PATH_LEN) == 0) { // Nothing to do as we have not changed the path, can work on the same JSON structure
-            LOG_DEBUG("updatePathInfo( %s ) return existing information", path);
+            LOG_DEBUG(">%s< already existing - return existing information", path);
             return &pathInfo;
         }
     }
 
-    LOG_DEBUG("updatePathInfo( %s ) ", path);
-    if (pathInfo.path) {
-        FREE(pathInfo.path);
-        pathInfo.path = NULL;
-    }
+    LOG_DEBUG("working now with path >%s< ", path);
 
+    if (pathInfo.path) FREE(pathInfo.path); // prevent allocating again on an already allocated memory
+    pathInfo.path = NULL;
     if (!(pathInfo.path = MALLOC(strnlen(path, MAX_PATH_LEN) + 1))) {
         LOG_ERR("Could not allocate Memory for pathInfo.path");
-        return NULL;
+        goto ERROR;
     }
 
     strncpy(pathInfo.path, path, strnlen(path, MAX_PATH_LEN) + 1);
@@ -63,7 +78,7 @@ PathInfo_t *updatePathInfo(const char *path) {
 
     if (fsh_HTTPListPath(pathInfo.path, &httpResponseBuffer)) {
         LOG_ERR("fsh_HTTPListPath() failed");
-        return NULL;
+        goto ERROR;
     }
 
     if (httpResponseBuffer->size == 0) { /* if only 1 byte is allocated (which is the initial allocation of the buffer) then the response was not ok */
@@ -80,66 +95,77 @@ PathInfo_t *updatePathInfo(const char *path) {
 
     result = &pathInfo;
 
+    goto EXIT;
+   
 ERROR:
-    if(httpResponseBuffer->memory) FREE(httpResponseBuffer->memory);
-    httpResponseBuffer->memory = NULL;
-    httpResponseBuffer->size = 0;
+    LOG_ERR("Leaving in an error condition.");
+EXIT:
+    if(httpResponseBuffer) { 
+        if(httpResponseBuffer->memory) FREE(httpResponseBuffer->memory);
+        httpResponseBuffer->memory = NULL;
+        httpResponseBuffer->size = 0;
+    }
+
     if (httpResponseBuffer) FREE(httpResponseBuffer);
     httpResponseBuffer = NULL;
 
     return result;
 }
 
-/*
-json_t *getSubElementByNamedPath(char *path, json_t *rootElement) {
-    unsigned int delimiterPos = 0;
-    char *tmpPath = strndup(path, PATH_MAX);
-    char *tmpPath_P = tmpPath;
-    char *tmpPath_StrChr_P;
+
+json_t *getSubElementByNamedPath(char *path, json_t *root) {
     json_t *result_json;
-    json_t *tmp_json;
+    int i;
 
-    if (!rootElement) {
+    LOG_DEBUG("searching for subelement >%s<",path);
+
+    if (!root) {
         LOG_ERR("can't walk through folders if data is not loaded");
-        return (json_t *)-1;
+        return NULL;
+    }
+    if (!json_is_array(root)) {
+        LOG_DEBUG("having single element no Array");
     }
 
-    //    delimiterPos = (unsigned int) (strchr(tmpPath_P, '/') - tmpPath_P);
-    tmpPath_StrChr_P = strchr(tmpPath_P, '/');
-    delimiterPos = (unsigned int)(tmpPath_StrChr_P - tmpPath_P);
+    json_array_foreach(root, i, result_json) {
 
-    if ((tmpPath_StrChr_P == tmpPath_P) && (strnlen(tmpPath_P, PATH_MAX) > 1)) {
-        ++tmpPath_P;
-        tmpPath_StrChr_P = strchr(tmpPath_P, '/');
-        delimiterPos = (unsigned int)(tmpPath_StrChr_P - tmpPath_P);
-    }
-    if (tmpPath_StrChr_P != NULL) {
-        tmpPath_P[delimiterPos] = '\0';
-    }
+         json_t *name = json_object_get(result_json, "name");
 
-    // printf("-------- tmpPath: %s, %lx, %lx\n", tmpPath_P, (unsigned long)(tmpPath_P + delimiterPos + 1), (unsigned long)(tmpPath_P + strnlen(path, PATH_MAX)));
-
-    tmp_json = json_object_get(rootElement, tmpPath_P);
-    result_json = tmp_json;
-
-    if (((tmpPath_P + delimiterPos + 1) < (tmpPath_P + strnlen(path, PATH_MAX))) && tmp_json) {
-        // printf("-------- going to recursion\n");
-        tmp_json = getSubElementByNamedPath(tmpPath_P + delimiterPos + 1, tmp_json);
-    }
-    if (tmp_json) {
-        result_json = tmp_json;
+        if (name && json_is_string(name)) {
+            char *objName = (char *) json_string_value(name);
+            LOG_DEBUG("Comparing searched: >%s< to found: >%s<",path, objName);
+            if(strncmp(path, objName, MAX_PATH_LEN) == 0) {
+            
+                return result_json;
+            }
+        }
     }
 
-    //    result_json = json_object_get();
-    FREE(tmpPath);
-    return result_json;
+   return NULL;
 }
-*/
+
 int fsh_walkFolders(WalkFolders_Callback_t callback, struct Fsh_DirLoaderRef_s *ref) {
 
-    LOG_DEBUG("fsh_walkFolders( %s )", ref->path);
+    LOG_DEBUG("Function entry with path >%s<", ref->path);
+    PathInfo_t *pathInfo = NULL;
 
-    PathInfo_t *pathInfo = updatePathInfo(ref->path);
+    int pathLen = strlen(ref->path);
+    if(ref->path[pathLen -1] == '/') {
+        pathInfo = updatePathInfo(ref->path);
+    } else {
+        char *tmpPath = MALLOC(pathLen + 1);
+        if(!tmpPath) {
+            LOG_ERR("cant allocate memory");
+            return -1;
+        }
+        strcpy(tmpPath,ref->path);
+        tmpPath[pathLen] = '/';
+        tmpPath[pathLen +1] = '\0';
+
+        pathInfo = updatePathInfo(tmpPath);
+        FREE(tmpPath);
+    }
+
 
     if (!pathInfo) {
         LOG_ERR("updatePathInfo( %s ) failed.", ref->path);
@@ -155,12 +181,10 @@ int fsh_walkFolders(WalkFolders_Callback_t callback, struct Fsh_DirLoaderRef_s *
     }
 
     if (!json_is_array(root)) {
-        LOG_DEBUG("fsh_walkFolders is single element no Array");
+        LOG_DEBUG("having single element no Array");
     }
 
     json_array_foreach(root, i, result_json) {
-
-        LOG_DEBUG("fsh_walkFolders----------------------------------- %d", i);
 
         if (result_json && json_is_object(result_json)) {
             json_t *type = json_object_get(result_json, "type");
@@ -168,154 +192,89 @@ int fsh_walkFolders(WalkFolders_Callback_t callback, struct Fsh_DirLoaderRef_s *
             json_t *path = json_object_get(result_json, "path");
             json_t *name = json_object_get(result_json, "name");
 
-            if (path && type && name && json_is_string(type) && json_is_string(path) && json_is_string(name) && (strcmp(json_string_value(type), "folder") == 0)) {
-
+            if (path && type && name && json_is_string(type) && json_is_string(path) && json_is_string(name) ) {
                 ref->filename = json_string_value(name);
                 ref->path = json_string_value(path);
+                LOG_DEBUG("Calling callback for folder update");
                 callback(ref);
             }
         }
-    }
+    }  /* END looping trough the current listing */
 
-    /*
-      LOG_DEBUG("fsh_walkFolders-----------------------------------");
-        void *iter = json_object_iter(root);
-        while (iter) {
-            LOG_DEBUG("fsh_walkFolders2-----------------------------------");
-            const char *key = json_object_iter_key(iter);
-            json_t *value = json_object_iter_value(iter);
-            LOG_DEBUG("Walking through JSON: %s",key);
-
-            iter = json_object_iter_next(result_json, iter);
-        }
-
-        */
-
-    /* END looping trough the current listing */
-
-#ifdef NOTUSED
-
-    //    result_json = getSubElementByNamedPath("/Cloud_Action/TS_actionOn_ObsLightValueSuperCloudAction/v2", root);
-    //    result_json = getSubElementByNamedPath("/Local_Action/actionOn_ObsLightValue/v1", root);
-    //    result_json = getSubElementByNamedPath("/", root);
-
-    result_json = (strcmp(ref->path, "/") == 0) ? root : getSubElementByNamedPath((char *)ref->path, root);
-
-    if (!result_json) {
-        LOG_ERR("getSubElementByNamedPath() retuned NULL");
-        return -2;
-    }
-
-    if (!json_is_object(result_json)) {
-        LOG_ERR("commit data is not an objec");
-        return -3;
-    }
-
-    void *iter = json_object_iter(result_json);
-    while (iter) {
-        const char *key = json_object_iter_key(iter);
-        json_t *value = json_object_iter_value(iter);
-
-        if (value && json_is_object(value)) {
-            //	    json_t *type = json_object_get(value, "type");
-
-            //	    if(type && json_is_string(type) && (strcmp(json_string_value(type), "folder") == 0)) {
-
-            // printf("-------- going to load33 %s \n", key);
-
-            ref->filename = key;
-            callback(ref);
-            //	    }
-        }
-
-        iter = json_object_iter_next(result_json, iter);
-    } /* END looping trough all elements of this level */
-
-    result_json = json_object_get(result_json, "atime");
-
-    //    LOG_DEBUG("json integer value: %d", (int)json_integer_value(result_json));
-    /*
-        if(!json_is_array(root)) {
-            fprintf(stderr, "error: data root is not an array\n");
-    //	json_decref(root);
-            return -2;
-        }
-    */
-
-    /*
-        for(i = 0; i < json_array_size(root); i++) {
-            json_t *data, *type, *dir_name;
-
-            data = json_array_get(root, i);
-            if(!json_is_object(data)) {
-                fprintf(stderr, "error: commit data %d is not an object\n", i + 1);
-    //	    json_decref(root);
-                return -3;
-            }
-
-            type = json_object_get(data, "type");
-            dir_name = json_object_get(data, "name");
-            if(json_is_string(type) && json_is_string(dir_name)) {
-                if (strcmp(json_string_value(type), "folder") == 0) {
-
-                    ref->filename = json_string_value(dir_name);
-                    callback(ref);
-    //		printf("found folder: %s\n", json_string_value(dir_name));
-                }
-
-            }
-        } */
-
-#endif
     return 0;
 }
 
 int fsh_getInfo(const char *path, struct Fsh_ObjectStat_s *file_info) {
 
-    LOG_DEBUG("fsh_getInfo %s", path);
+    LOG_DEBUG("working on >%s<", path);
 
-    PathInfo_t *pathInfo = updatePathInfo(path);
 
+    char *tmpPath = MALLOC(strlen(path) + 1);
+    if(!tmpPath) {
+        LOG_ERR("cant allocate memory");
+        return -1;
+    }
+    strcpy(tmpPath,path);
+    for(int i = strlen(tmpPath); i >= 0; --i) {
+        if(tmpPath[i] == '/') {
+            tmpPath[i+1] = '\0';
+            break;
+        }
+    }
+
+    LOG_DEBUG("calling updatePathInfo with >%s<", tmpPath);
+
+    PathInfo_t *pathInfo = updatePathInfo(tmpPath);
+
+    FREE(tmpPath);
+ 
+ 
     if (!pathInfo) {
         LOG_ERR("updatePathInfo() Failed");
         return -2;
     }
 
     json_t *root = pathInfo->jsonObjectRoot;
-    //    json_t *result_json;
+    json_t *result_json;
 
     if (!root) {
         LOG_ERR("Data is not loaded");
         return -1;
     }
-    /*
-        result_json = getSubElementByNamedPath((char *)path, root);
 
-        if (!result_json) {
-            LOG_WARN("getSubElementByNamedPath() retuned NULL, using path: %s", path);
-            return -2;
-        }
 
-        if (!json_is_object(result_json)) {
-            LOG_ERR("commit data is not an object");
-            return -3;
-        }
+    result_json = getSubElementByNamedPath(basename((char *)path) , root);
 
-        json_t *type = json_object_get(result_json, "type");
-        //    json_t *onlinePath = json_object_get(result_json, "onlinePath");
-        json_t *atime = json_object_get(result_json, "atime");
+    if (!result_json) {
+        LOG_WARN("getSubElementByNamedPath() retuned NULL, using path: %s", path);
+        return -2;
+    }
 
-        //  && onlinePath && json_is_string(onlinePath)
+    if (!json_is_object(result_json)) {
+        LOG_ERR("commit data is not an object");
+        return -3;
+    }
 
-        if (type && json_is_string(type) && atime && json_is_integer(atime)) {
+    json_t *type = json_object_get(result_json, "type");
+    json_t *atime = json_object_get(result_json, "created");
 
-            //	file_info->onlinePath = (char *) json_string_value(onlinePath);
-            file_info->atime = json_integer_value(atime);
+
+    if (type && json_is_string(type) && atime && json_is_string(atime)) {
+
+            char *timeStr = (char *) json_string_value(atime);
+
+            struct tm parsedATime;
+            memset(&parsedATime, 0, sizeof(parsedATime));
+            strptime(timeStr, "%FT%T%z", &parsedATime);
+            file_info->atime = mktime(&parsedATime);
+
             file_info->filesize = 0;
             LOG_DEBUG("path: %s, type: %s", path, json_string_value(type));
+
             if (strcmp(json_string_value(type), "folder") == 0) {
                 file_info->type = FSH_STAT_TYPE_FOLDER;
             } else if (strcmp(json_string_value(type), "file") == 0) {
+
                 json_t *filesize = json_object_get(result_json, "size");
                 if (filesize && json_is_integer(filesize)) {
                     file_info->type = FSH_STAT_TYPE_FILE;
@@ -324,44 +283,31 @@ int fsh_getInfo(const char *path, struct Fsh_ObjectStat_s *file_info) {
                     LOG_ERR("File object did not contain size information");
                     return -101;
                 }
-            } else if (strcmp(json_string_value(type), "reference") == 0) {
-                file_info->type = FSH_STAT_TYPE_REFERENCE;
+
             } else {
+                LOG_WARN("Unknown file type");
                 return -100;
             }
         }
-    */
+  
     return 0;
 }
 
 int fsh_getLinkInfo(const char *path, char *linkDstPath, size_t size) {
     LOG_DEBUG("fsh_getLinkInfo %s", path);
-    /*
-        json_t *root = setGetRoot(NULL);
-        json_t *result_json;
-
-        if (!root) {
-            LOG_ERR("can't get Info if data is not loaded");
-            return -1;
-        }
-
-        result_json = getSubElementByNamedPath((char *)path, root);
-
-        if (!result_json) {
-            LOG_ERR("getSubElementByNamedPath() retuned NULL");
-            return -2;
-        }
-
-        if (!json_is_object(result_json)) {
-            LOG_ERR("commit data is not an object");
-            return -3;
-        }
-
-        json_t *reference = json_object_get(result_json, "reference");
-
-        if (reference && json_is_string(reference)) {
-            strncpy(linkDstPath, json_string_value(reference), size);
-        }
-    */
     return 0;
+}
+
+void fsh_container_destroy() {
+  	LOG_DEBUG("calling destroy chain");
+    if (pathInfo.jsonObjectRoot) {
+        json_decref(pathInfo.jsonObjectRoot);
+        pathInfo.jsonObjectRoot = NULL;
+    }
+    if (pathInfo.path) {
+        FREE(pathInfo.path);
+        pathInfo.path = NULL;
+    }
+ 
+
 }

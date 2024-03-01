@@ -25,7 +25,7 @@
 #define MESSAGES_H
 
 extern int verbosity;
-
+extern int logColor;
 
 
 #define ANSI_COLOR_RED     "\x1b[31m"
@@ -36,32 +36,44 @@ extern int verbosity;
 #define ANSI_COLOR_CYAN    "\x1b[36m"
 #define ANSI_COLOR_RESET   "\x1b[0m"
 
+#define COND_COLOR(color) (logColor ? color : "")
+
 #define MSG_HELP(command) \
-            "\n"                                                              \
-            "-h                         Help (this print basically)\n"        \
-            "-k <pathAndKeyfile>        give path to keyfile\n"               \
-            "-v <level 0-3>             verbosity levelv 0= only errors\n"    \
-            "                                            1= Info       \n"    \
-            "                                            2= Debug      \n"    \
-            "                                            3= Memeory Debug\n"  \
-            "\n"                                                              \
-            "Basic Usage:\n"                                                  \
-            "    %s -k key/googleKey-1234.json\n"                             \
+	        "File-system specific options:\n"                                  \
+	        "    -v=<n>              0-4 verbosity levelv 0= only errors\n"    \
+            "                                             1= Warning    \n"    \
+            "                                             2= Info       \n"    \
+            "                                             3= Debug      \n"    \
+            "                                             4= Memory Debug\n"   \
+            "\n"                                                               \
+	        "    -c                  Log Color\n"                              \
+            "\n"                                                               \
+            "Basic Usage:\n"                                                   \
+            "    %s -f testdirectory\n"                                        \
             "\n", command
 
 
-#define PRINT_MSG_HELP_AND_EXIT(command)       printf(MSG_HELP(command)); exit(1);
+#define PRINT_MSG_HELP(command)       printf(MSG_HELP(command));
+
+
+#ifndef __FUNCTION_NAME__
+    #ifdef WIN32   //WINDOWS
+        #define __FUNCTION_NAME__   __FUNCTION__  
+    #else          //*NIX
+        #define __FUNCTION_NAME__   __func__ 
+    #endif
+#endif
 
 
 #ifndef __FILE_NAME__
 #define __FILE_NAME__ __FILE__
 #endif
 
-#define MEM_DBG(_fmt,...)         if(verbosity > 3) fprintf(stdout, ANSI_COLOR_MAGENTA  "[MEM_DBG] " _fmt ANSI_COLOR_RESET "\n", ##__VA_ARGS__  )
-#define LOG_DEBUG(_fmt,...)       if(verbosity > 2) fprintf(stdout, ANSI_COLOR_GREEN    "[DEBUG]   " _fmt "\t(%s:%d)" ANSI_COLOR_RESET "\n", ##__VA_ARGS__  , __FILE_NAME__, __LINE__)
-#define LOG_INFO(_fmt,...)        if(verbosity > 1) fprintf(stdout, ANSI_COLOR_BLUE     "[INFO]    " _fmt "\t(%s:%d)" ANSI_COLOR_RESET "\n", ##__VA_ARGS__  , __FILE_NAME__, __LINE__)
-#define LOG_WARN(_fmt,...)        if(verbosity > 0) fprintf(stdout, ANSI_COLOR_YELLOW   "[WARN]    " _fmt "\t(%s:%d)" ANSI_COLOR_RESET "\n", ##__VA_ARGS__  , __FILE_NAME__, __LINE__)
-#define LOG_ERR(_fmt,...)                           fprintf(stderr, ANSI_COLOR_RED      "[ERROR]   " _fmt "\t(%s:%d)" ANSI_COLOR_RESET "\n", ##__VA_ARGS__  , __FILE_NAME__, __LINE__)
+#define MEM_DBG(_fmt,...)         if(verbosity > 3) fprintf(stdout, "%s[MEM_DBG] "   _fmt "%s\n", COND_COLOR(ANSI_COLOR_MAGENTA),  ##__VA_ARGS__  , COND_COLOR(ANSI_COLOR_RESET))
+#define LOG_DEBUG(_fmt,...)       if(verbosity > 2) fprintf(stdout, "%s[DEBUG]   %s():\t"   _fmt "\t(%s:%d)%s\n", COND_COLOR(ANSI_COLOR_GREEN), __FUNCTION_NAME__,    ##__VA_ARGS__  , __FILE_NAME__, __LINE__, COND_COLOR(ANSI_COLOR_RESET))
+#define LOG_INFO(_fmt,...)        if(verbosity > 1) fprintf(stdout, "%s[INFO]    %s():\t"   _fmt "\t(%s:%d)%s\n", COND_COLOR(ANSI_COLOR_BLUE), __FUNCTION_NAME__,     ##__VA_ARGS__  , __FILE_NAME__, __LINE__, COND_COLOR(ANSI_COLOR_RESET))
+#define LOG_WARN(_fmt,...)        if(verbosity > 0) fprintf(stdout, "%s[WARN]    %s():\t"   _fmt "\t(%s:%d)%s\n", COND_COLOR(ANSI_COLOR_YELLOW), __FUNCTION_NAME__,   ##__VA_ARGS__  , __FILE_NAME__, __LINE__, COND_COLOR(ANSI_COLOR_RESET))
+#define LOG_ERR(_fmt,...)                           fprintf(stderr, "%s[ERROR]   %s():\t"   _fmt "\t(%s:%d)%s\n", COND_COLOR(ANSI_COLOR_RED), __FUNCTION_NAME__,      ##__VA_ARGS__  , __FILE_NAME__, __LINE__, COND_COLOR(ANSI_COLOR_RESET))
 
 #define LOG_MEM_ERR(_fmt,...)         fprintf(stderr, "[ERROR]   " _fmt "\n", ##__VA_ARGS__ )
 

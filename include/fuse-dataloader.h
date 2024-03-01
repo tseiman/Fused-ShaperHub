@@ -45,6 +45,6 @@ int fsh_dirLoader(struct Fsh_DirLoaderRef_s *ref);
 int fsh_statForPath(const char *path, struct stat *stbuf);
 int fsh_LinkInfo(const char *path, char * linkDstPath, size_t size);
 int fsh_FileLoader(const char *path, char *buf, size_t size, off_t offset);
-
+void fsh_dataloader_destroy(void);
 
 #endif

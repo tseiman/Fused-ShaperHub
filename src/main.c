@@ -21,26 +21,32 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <signal.h>
 
+#include <alloc.h>
 #include <fused-shaperhub.h>
 #include <messages.h>
-#include <http-connector.h>
-#include <data-container.h>
 
+
+void sig_handler(int);
 
 int verbosity = 0;
-
+int logColor = 0;
 
 static void show_help(const char *progname) {
-	printf("usage: %s [options] <mountpoint>\n\n", progname);
-	printf("File-system specific options:\n"
-	       "    -v=<n>              0-4 Debug Level\n"
-	       "\n");
+    PRINT_MSG_HELP(progname);
 }
 
 
 
 int main(int argc, char **argv) {
+
+
+
+    signal(SIGINT, sig_handler);
+    signal(SIGTERM, sig_handler);
+    signal(SIGKILL, sig_handler);
+    
 
     fsh_initFuse(argc, argv, &show_help);
 
@@ -48,3 +54,13 @@ int main(int argc, char **argv) {
     return 0;
 }
 
+
+void sig_handler(int sig) {
+    int toFree = 0;
+    LOG_INFO("Received SIGTERM - cleaning up and exiting.");
+    fsh_shaperhub_destroy();
+    if(toFree = getAlloCounter()) {
+        LOG_WARN("Not all memory have been freed - still left: %d", toFree);
+    }
+    exit(0);
+}

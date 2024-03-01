@@ -31,6 +31,49 @@
 
 #define STRLEN(s) (sizeof(s) / sizeof(s[0]))
 
+
+char* replace_char(char* str, char find, char replace){
+    char *current_pos = strchr(str,find);
+    while (current_pos) {
+        *current_pos = replace;
+        current_pos = strchr(current_pos,find);
+    }
+    return str;
+}
+
+
+size_t escapeURL(char * buffer, char **newBufferIn, size_t len) {
+    const char URLEncodingLookup[] = SUBSITUTE_LOOKUP;
+    size_t newSize = len + 1;
+    int newOffset = 0;
+
+    char *newBuffer = MALLOC(len);                              // we have to copy the original buffer to the new. 
+                                                                // Some characters are expanded to %XX (Hex) 
+                                                                // - so initially the new buffer is minimum that long than old 
+                                                                
+    if(!newBuffer) {
+        return 0;
+    }
+
+    for(int i; i <= newSize + 1; ++i) {
+        if(URLEncodingLookup[buffer[i]]) {
+            newBuffer[i + newOffset] = buffer[i];
+        } else {
+            if(buffer[i] == '\0') {
+                newBuffer[i + newOffset]  = buffer[i];
+                break;
+            }
+            newSize += 3;
+            newBuffer = REALLOC(newBuffer, newSize);
+            sprintf(newBuffer + i + newOffset, "%%%02X",buffer[i]);
+            newOffset += 2;
+
+        }
+    } 
+    *newBufferIn = newBuffer;
+    return newSize;
+}
+
 static size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp) {
     size_t realsize = size * nmemb;
     MemoryStruct_t *mem = (MemoryStruct_t *)userp;
@@ -62,23 +105,43 @@ int checkPathLen(char *str) {
     return 0;
 }
 
+
+
+/** *************************************************************************
+ * Requests the folder listing for a specific folder
+ * 
+ * Parameter:
+ *      char *path                      --> the path of the folder
+ *      MemoryStruct_t **responseBuffer --> 
+ * ************************************************************************ **/
 int fsh_HTTPListPath(char *path, MemoryStruct_t **responseBuffer) {
+
+    LOG_DEBUG("requesting >%s< from remote resource.", path);
 
     CURL *curl;
     CURLcode res;
     MemoryStruct_t *chunk = MALLOC(sizeof(MemoryStruct_t));
+    chunk->memory = NULL;
+    chunk->size = 0;
 
     int result = -1;
 
-
-//    chunk.memory = MALLOC(1); /* will be grown as needed by the realloc above */
     chunk->memory = NULL; /* will be grown as needed by the realloc above */
     chunk->size = 0;           /* no data at this point */
-    LOG_INFO("fsh_ListPath %s", path);
 
-//    char pathbuffer[MAX_PATH_LEN] = BASEURL;
 
-    char *pathbuffer = MALLOC(strlen(BASEURL) + strlen(path) + 1);
+    char *escapedURLBuffer = NULL;
+    int newUrlSize = escapeURL(path, &escapedURLBuffer, strlen(path));
+    if(!newUrlSize) {
+        LOG_ERR("Filed to escape URL");
+        result = -5;
+        goto ERROR;
+    }
+    
+    LOG_DEBUG("Escaped URL: >%s<", escapedURLBuffer);
+
+
+    char *pathbuffer = MALLOC(strlen(BASEURL) + strlen(escapedURLBuffer) + 1);
     
     if(!pathbuffer) {
         LOG_ERR("not enough memory fsh_HTTPListPath pathbuffer allocation");
@@ -90,12 +153,12 @@ int fsh_HTTPListPath(char *path, MemoryStruct_t **responseBuffer) {
         result = -4;
         goto ERROR;
     }
-    
-    strcpy(pathbuffer,BASEURL);
-   // strncat(pathbuffer, path, (MAX_PATH_LEN - STRLEN(BASEURL) + 1));
-    strcat(pathbuffer, path);
 
-    LOG_DEBUG("fsh_ListPath() Setting path to: %s", pathbuffer);
+    strcpy(pathbuffer,BASEURL);
+    strncat(pathbuffer, escapedURLBuffer, (MAX_PATH_LEN - STRLEN(BASEURL) + 1));
+
+    LOG_DEBUG("asembled path to: >%s<", pathbuffer);
+
     curl_global_init(CURL_GLOBAL_ALL);
     curl = curl_easy_init();
     if (!curl) {
@@ -106,20 +169,16 @@ int fsh_HTTPListPath(char *path, MemoryStruct_t **responseBuffer) {
     curl_easy_setopt(curl, CURLOPT_URL, pathbuffer);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, chunk);                               // pass 'chunk' struct to the callback function
 
-    /* we pass our 'chunk' struct to the callback function */
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, chunk);
+    res = curl_easy_perform(curl);                                                  // Perform the request 
 
-    /* Perform the request, res will get the return code */
-    res = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
 
-    /* Check for errors */
     if (res != CURLE_OK) {
         LOG_ERR("curl_easy_perform() failed: %s", curl_easy_strerror(res));
         goto ERROR;
     }
-    /* always cleanup */
-    curl_easy_cleanup(curl);
 
     chunk->memory[chunk->size] = '\0';
     *responseBuffer = chunk;
@@ -127,13 +186,22 @@ int fsh_HTTPListPath(char *path, MemoryStruct_t **responseBuffer) {
     
     goto EXIT;
 ERROR:
-EXIT:
-//    if(chunk) FREE(chunk);
- //   chunk = NULL;
+    LOG_ERR("Leaving in an error condition.");
 
+    if(chunk) {
+        if(chunk->memory) FREE(chunk->memory);
+        chunk->memory = NULL; 
+        if(chunk) FREE(chunk);
+        chunk = NULL;
+    }
+   // *responseBuffer = NULL;
+EXIT:
     if(pathbuffer) FREE(pathbuffer);
     pathbuffer = NULL; 
-    
+
+   if(escapedURLBuffer) FREE(escapedURLBuffer);
+   escapedURLBuffer = NULL;
+
     curl_global_cleanup();
 
     return result;

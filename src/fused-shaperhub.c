@@ -132,6 +132,9 @@ static struct fuse_operations mount_fsh_operations = {
     .readlink = readlink_callback,
 };
 
+extern int verbosity;
+extern int logColor;
+
 int fsh_initFuse(int argc, char *argv[], showHelp_f showHelp) {
     /*     struct fuse_args args ;
             LOG_INFO("fsh_initFuse");
@@ -141,12 +144,19 @@ int fsh_initFuse(int argc, char *argv[], showHelp_f showHelp) {
 
     static struct options {
         int verbose;
+        int logColor;
         int showHelp;
     } options;
 
 #define OPTION(t, p)  { t, offsetof(struct options, p), 1 }
 
-    static const struct fuse_opt option_spec[] = {OPTION("-v=%d", verbose), OPTION("-h", showHelp), OPTION("--help", showHelp), FUSE_OPT_END};
+    static const struct fuse_opt option_spec[] = {
+        OPTION("-v=%d", verbose), 
+        OPTION("-h", showHelp), 
+        OPTION("-c", logColor), 
+        OPTION("--help", showHelp), 
+        FUSE_OPT_END
+    };
 
     int ret;
     struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
@@ -155,7 +165,7 @@ int fsh_initFuse(int argc, char *argv[], showHelp_f showHelp) {
        fuse_opt_parse can free the defaults if other
        values are specified */
     options.verbose = 1;
-
+    options.logColor = 0;
     /* Parse options */
     if (fuse_opt_parse(&args, &options, option_spec, NULL) == -1)
         return 1;
@@ -171,7 +181,14 @@ int fsh_initFuse(int argc, char *argv[], showHelp_f showHelp) {
         args.argv[0][0] = '\0';
     }
 
+
     verbosity = options.verbose;
+    logColor = options.logColor;
     ret = fuse_main(args.argc, args.argv, &mount_fsh_operations, NULL);
     fuse_opt_free_args(&args);
+}
+
+void fsh_shaperhub_destroy() {
+   	LOG_DEBUG("calling destroy chain");
+    fsh_dataloader_destroy();
 }

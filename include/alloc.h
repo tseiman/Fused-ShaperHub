@@ -14,16 +14,18 @@
  * ****************************************************************************
  * **************************************************************************** **/
 
+#include <messages.h>
+
 #ifndef ALLOC_H
 #define ALLOC_H
 
-#define MALLOC(size) gcp_malloc(size, __FILE_NAME__, __LINE__)
-#define REALLOC(p,size) gcp_realloc(p, size, __FILE_NAME__, __LINE__)
-#define FREE(p) gcp_free(p, __FILE_NAME__, __LINE__)
+#define MALLOC(size) gcp_malloc(__FUNCTION__, size, __FILE_NAME__, __LINE__)
+#define REALLOC(p,size) gcp_realloc(__FUNCTION__, p, size, __FILE_NAME__, __LINE__)
+#define FREE(p) gcp_free(__FUNCTION__, p, __FILE_NAME__, __LINE__)
 
-void *gcp_malloc(size_t size, char* caller, unsigned int line );
-void *gcp_realloc(void *p, size_t size, char* caller, unsigned int line );
-void gcp_free(void *p, char* caller, unsigned int line );
-
+void *gcp_malloc(const char *funcName, size_t size, char* caller, unsigned int line );
+void *gcp_realloc(const char *funcName, void *p, size_t size, char* caller, unsigned int line );
+void gcp_free(const char *funcName, void *p, char* caller, unsigned int line );
+int getAlloCounter(void);
 
 #endif

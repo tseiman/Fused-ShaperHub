@@ -32,4 +32,4 @@ typedef struct {
 int fsh_walkFolders(WalkFolders_Callback_t callback, struct Fsh_DirLoaderRef_s *ref);
 int fsh_getInfo(const char *path,struct Fsh_ObjectStat_s *file_info);
 int fsh_getLinkInfo(const char *path, char * linkDstPath, size_t size);
-
+void fsh_container_destroy(void);
