@@ -39,21 +39,19 @@ static int getattr_callback(const char *path, struct stat *stbuf) {
     LOG_DEBUG("getattr_callback %s", path);
     memset(stbuf, 0, sizeof(struct stat));
 
-    if (strcmp(path, "/") == 0) {
+    if (strncmp(path, "/", MAX_PATH_LEN) == 0) {
         stbuf->st_mode = S_IFDIR | 0755;
         stbuf->st_nlink = 1;
         stbuf->st_atime = stbuf->st_mtime = stbuf->st_ctime = time(NULL);
         return 0;
     }
 
-    if (!fsh_statForPath(path, stbuf)) {
-#ifdef MOCFILES_ATTR
-        MOCFILES_ATTR; // this brings in for some hardcoded "files" for mockup
-#endif
-        return 0;
+    if (fsh_statForPath(path, stbuf)) {
+        LOG_WARN("STAT fort Path failed");
+        return -ENOENT;
     }
 
-    return -ENOENT;
+    return 0;
 }
 
 static int readdir_callback(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi) {
@@ -77,43 +75,15 @@ static int readdir_callback(const char *path, void *buf, fuse_fill_dir_t filler,
     return -ENOENT;
 }
 
-static int open_callback(const char *path, struct fuse_file_info *fi) { return 0; }
+static int open_callback(const char *path, struct fuse_file_info *fi) { 
+    (void)fi;
+    LOG_DEBUG(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> OPEN %s", path);
+    return 0; 
+}
 
 static int read_callback(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
-    LOG_DEBUG("read_callback %s", path);
-    //    return oct_FileLoader(path,buf,size,offset);
-    /*
-        if (strcmp(path, filepath) == 0) {
-            size_t len = strlen(filecontent);
-            if (offset >= len) {
-                return 0;
-            }
-
-            if (offset + size > len) {
-                memcpy(buf, filecontent + offset, len - offset);
-                return len - offset;
-            }
-
-            memcpy(buf, filecontent + offset, size);
-            return size;
-        }
-
-        if (strcmp(path, filepath1) == 0) {
-            size_t len = strlen(filecontent1);
-            if (offset >= len) {
-                return 0;
-            }
-
-            if (offset + size > len) {
-                memcpy(buf, filecontent1 + offset, len - offset);
-                return len - offset;
-            }
-
-            memcpy(buf, filecontent1 + offset, size);
-            return size;
-        }
-    */
-    return -ENOENT;
+    LOG_DEBUG("Reading file callback %s", path);
+    return fsh_FileLoader(path,buf,size,offset);
 }
 
 int readlink_callback(const char *path, char *buf, size_t size) {
@@ -136,11 +106,6 @@ extern int verbosity;
 extern int logColor;
 
 int fsh_initFuse(int argc, char *argv[], showHelp_f showHelp) {
-    /*     struct fuse_args args ;
-            LOG_INFO("fsh_initFuse");
-            fuse_opt_add_arg(& args, "-x");
-        return fuse_main(argc, argv, &mount_fsh_operations, NULL);
-      */
 
     static struct options {
         int verbose;

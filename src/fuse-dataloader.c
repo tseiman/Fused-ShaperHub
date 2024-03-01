@@ -33,19 +33,18 @@ MOC_DEMO_FILES;
 #endif
 
 int fsh_dirLoaderCallback(struct Fsh_DirLoaderRef_s *ref) {
-	LOG_DEBUG("called fsh_walkFolders() with Fsh_DirLoaderRef_s.filename: >%s<",ref->filename);
     ref->filler(ref->buf, ref->filename, NULL, 0);
-
     return 0;
 }
 
 int fsh_dirLoader(struct Fsh_DirLoaderRef_s *ref) {
-
-
     return fsh_walkFolders(fsh_dirLoaderCallback, ref);
-
 }
 
+
+int fsh_fileOpener(const char *path) {
+
+}
 
 int fsh_FileLoader(const char *path, char *buf, size_t size, off_t offset) {
     LOG_DEBUG("READ data chunk with size %d at offet %ld file: >%s<", (int)size, offset, path);
@@ -110,7 +109,7 @@ LOG_DEBUG("fsh_statForPath( %s)", path);
 	    break;
 	case FSH_STAT_TYPE_FILE:
 	    LOG_DEBUG("FILE with name addded: %s",path);
-	    stbuf->st_mode = S_IFREG | 0666;
+	    stbuf->st_mode = S_IFREG | 0644;
 	    stbuf->st_nlink = 1;
 	    stbuf->st_size = file_info.filesize;
 	    stbuf->st_atime = stbuf->st_mtime = stbuf->st_ctime = file_info.atime;

@@ -31,6 +31,7 @@
 
 #define STRLEN(s) (sizeof(s) / sizeof(s[0]))
 
+/*
 
 char* replace_char(char* str, char find, char replace){
     char *current_pos = strchr(str,find);
@@ -40,7 +41,7 @@ char* replace_char(char* str, char find, char replace){
     }
     return str;
 }
-
+*/
 
 size_t escapeURL(char * buffer, char **newBufferIn, size_t len) {
     const char URLEncodingLookup[] = SUBSITUTE_LOOKUP;
@@ -51,9 +52,7 @@ size_t escapeURL(char * buffer, char **newBufferIn, size_t len) {
                                                                 // Some characters are expanded to %XX (Hex) 
                                                                 // - so initially the new buffer is minimum that long than old 
                                                                 
-    if(!newBuffer) {
-        return 0;
-    }
+    if(!newBuffer) return 0;
 
     for(int i; i <= newSize + 1; ++i) {
         if(URLEncodingLookup[buffer[i]]) {
@@ -64,7 +63,15 @@ size_t escapeURL(char * buffer, char **newBufferIn, size_t len) {
                 break;
             }
             newSize += 3;
-            newBuffer = REALLOC(newBuffer, newSize);
+            
+            char *tmpBuffer = REALLOC(newBuffer, newSize);
+            if(!tmpBuffer) {
+                FREE(newBuffer);
+                newBuffer = NULL;
+                return 0;
+            }
+            newBuffer = tmpBuffer;
+
             sprintf(newBuffer + i + newOffset, "%%%02X",buffer[i]);
             newOffset += 2;
 
@@ -120,18 +127,15 @@ int fsh_HTTPListPath(char *path, MemoryStruct_t **responseBuffer) {
 
     CURL *curl;
     CURLcode res;
-    MemoryStruct_t *chunk = MALLOC(sizeof(MemoryStruct_t));
-    chunk->memory = NULL;
-    chunk->size = 0;
-
     int result = -1;
+    MemoryStruct_t *chunk = MALLOC(sizeof(MemoryStruct_t));
+    if(!chunk) goto ERROR;
 
     chunk->memory = NULL; /* will be grown as needed by the realloc above */
     chunk->size = 0;           /* no data at this point */
 
-
     char *escapedURLBuffer = NULL;
-    int newUrlSize = escapeURL(path, &escapedURLBuffer, strlen(path));
+    int newUrlSize = escapeURL(path, &escapedURLBuffer, strnlen(path,MAX_PATH_LEN));
     if(!newUrlSize) {
         LOG_ERR("Filed to escape URL");
         result = -5;
@@ -140,22 +144,18 @@ int fsh_HTTPListPath(char *path, MemoryStruct_t **responseBuffer) {
     
     LOG_DEBUG("Escaped URL: >%s<", escapedURLBuffer);
 
+    size_t pathbuffer_len = strnlen(BASEURL,MAX_PATH_LEN) + strnlen(escapedURLBuffer,MAX_PATH_LEN - strnlen(BASEURL,MAX_PATH_LEN)) + 1;
+    char *pathbuffer = MALLOC(pathbuffer_len);
+    if(!pathbuffer) goto ERROR; 
 
-    char *pathbuffer = MALLOC(strlen(BASEURL) + strlen(escapedURLBuffer) + 1);
-    
-    if(!pathbuffer) {
-        LOG_ERR("not enough memory fsh_HTTPListPath pathbuffer allocation");
-        result = -3;
-        goto ERROR; 
-    }
 
     if (checkPathLen(path)) {
         result = -4;
         goto ERROR;
     }
 
-    strcpy(pathbuffer,BASEURL);
-    strncat(pathbuffer, escapedURLBuffer, (MAX_PATH_LEN - STRLEN(BASEURL) + 1));
+    strncpy(pathbuffer,BASEURL, pathbuffer_len);
+    strncat(pathbuffer, escapedURLBuffer, pathbuffer_len - STRLEN(BASEURL) + 1);
 
     LOG_DEBUG("asembled path to: >%s<", pathbuffer);
 
@@ -188,20 +188,13 @@ int fsh_HTTPListPath(char *path, MemoryStruct_t **responseBuffer) {
 ERROR:
     LOG_ERR("Leaving in an error condition.");
 
-    if(chunk) {
-        if(chunk->memory) FREE(chunk->memory);
-        chunk->memory = NULL; 
-        if(chunk) FREE(chunk);
-        chunk = NULL;
-    }
-   // *responseBuffer = NULL;
+    if(chunk) FREE(chunk->memory);
+    FREE(chunk);
+
 EXIT:
-    if(pathbuffer) FREE(pathbuffer);
-    pathbuffer = NULL; 
-
-   if(escapedURLBuffer) FREE(escapedURLBuffer);
-   escapedURLBuffer = NULL;
-
+    FREE(pathbuffer);
+    FREE(escapedURLBuffer);
+   
     curl_global_cleanup();
 
     return result;

@@ -62,14 +62,13 @@ PathInfo_t *updatePathInfo(const char *path) {
 
     LOG_DEBUG("working now with path >%s< ", path);
 
-    if (pathInfo.path) FREE(pathInfo.path); // prevent allocating again on an already allocated memory
-    pathInfo.path = NULL;
-    if (!(pathInfo.path = MALLOC(strnlen(path, MAX_PATH_LEN) + 1))) {
-        LOG_ERR("Could not allocate Memory for pathInfo.path");
-        goto ERROR;
-    }
+    FREE(pathInfo.path); // prevent allocating again on an already allocated memory
 
-    strncpy(pathInfo.path, path, strnlen(path, MAX_PATH_LEN) + 1);
+    size_t pathInfo_path_len = strnlen(path, MAX_PATH_LEN) + 1;
+    pathInfo.path =  MALLOC(pathInfo_path_len);
+
+    MEMCHK(pathInfo.path) goto ERROR;
+    strncpy(pathInfo.path, path, pathInfo_path_len);
 
     if (pathInfo.jsonObjectRoot) {
         json_decref(pathInfo.jsonObjectRoot);
@@ -85,7 +84,6 @@ PathInfo_t *updatePathInfo(const char *path) {
         LOG_ERR("Invalid httpResponseBuffer size : %zd", httpResponseBuffer->size);
         goto ERROR;
     }
-
     LOG_DEBUG(" httpResponseBuffer size : %s/%zd/%s", pathInfo.path, httpResponseBuffer->size, httpResponseBuffer->memory);
     if (!(pathInfo.jsonObjectRoot = json_loadb(httpResponseBuffer->memory, httpResponseBuffer->size, 0, &error))) {
         LOG_ERR("when loading JSON line:%d  error:%s ", error.line, error.text);
@@ -100,14 +98,11 @@ PathInfo_t *updatePathInfo(const char *path) {
 ERROR:
     LOG_ERR("Leaving in an error condition.");
 EXIT:
-    if(httpResponseBuffer) { 
-        if(httpResponseBuffer->memory) FREE(httpResponseBuffer->memory);
-        httpResponseBuffer->memory = NULL;
+    if(httpResponseBuffer) {
+        FREE(httpResponseBuffer->memory);
         httpResponseBuffer->size = 0;
     }
-
-    if (httpResponseBuffer) FREE(httpResponseBuffer);
-    httpResponseBuffer = NULL;
+    FREE(httpResponseBuffer);
 
     return result;
 }
@@ -132,7 +127,7 @@ json_t *getSubElementByNamedPath(char *path, json_t *root) {
          json_t *name = json_object_get(result_json, "name");
 
         if (name && json_is_string(name)) {
-            char *objName = (char *) json_string_value(name);
+            const char *objName = json_string_value(name);
             LOG_DEBUG("Comparing searched: >%s< to found: >%s<",path, objName);
             if(strncmp(path, objName, MAX_PATH_LEN) == 0) {
             
@@ -149,16 +144,14 @@ int fsh_walkFolders(WalkFolders_Callback_t callback, struct Fsh_DirLoaderRef_s *
     LOG_DEBUG("Function entry with path >%s<", ref->path);
     PathInfo_t *pathInfo = NULL;
 
-    int pathLen = strlen(ref->path);
+    int pathLen = strnlen(ref->path, MAX_PATH_LEN);
     if(ref->path[pathLen -1] == '/') {
         pathInfo = updatePathInfo(ref->path);
     } else {
         char *tmpPath = MALLOC(pathLen + 1);
-        if(!tmpPath) {
-            LOG_ERR("cant allocate memory");
-            return -1;
-        }
-        strcpy(tmpPath,ref->path);
+        if(!tmpPath) return -1;
+
+        strncpy(tmpPath,ref->path, pathLen + 1);
         tmpPath[pathLen] = '/';
         tmpPath[pathLen +1] = '\0';
 
@@ -209,13 +202,12 @@ int fsh_getInfo(const char *path, struct Fsh_ObjectStat_s *file_info) {
     LOG_DEBUG("working on >%s<", path);
 
 
-    char *tmpPath = MALLOC(strlen(path) + 1);
-    if(!tmpPath) {
-        LOG_ERR("cant allocate memory");
-        return -1;
-    }
-    strcpy(tmpPath,path);
-    for(int i = strlen(tmpPath); i >= 0; --i) {
+    size_t bufferLen = strnlen(path, MAX_PATH_LEN) + 1;
+    char *tmpPath = MALLOC(bufferLen);
+    if(!tmpPath) return -1;
+    
+    strncpy(tmpPath,path, bufferLen);
+    for(int i = bufferLen - 1; i >= 0; --i) {
         if(tmpPath[i] == '/') {
             tmpPath[i+1] = '\0';
             break;
@@ -242,8 +234,13 @@ int fsh_getInfo(const char *path, struct Fsh_ObjectStat_s *file_info) {
         return -1;
     }
 
+    tmpPath = MALLOC(strnlen(path, MAX_PATH_LEN) + 1);
+    MEMCHK(tmpPath) return -1;
 
-    result_json = getSubElementByNamedPath(basename((char *)path) , root);
+    strcpy(tmpPath, path);
+    result_json = getSubElementByNamedPath(basename(tmpPath) , root);
+    
+    FREE(tmpPath);
 
     if (!result_json) {
         LOG_WARN("getSubElementByNamedPath() retuned NULL, using path: %s", path);
@@ -261,7 +258,7 @@ int fsh_getInfo(const char *path, struct Fsh_ObjectStat_s *file_info) {
 
     if (type && json_is_string(type) && atime && json_is_string(atime)) {
 
-            char *timeStr = (char *) json_string_value(atime);
+            const char *timeStr = json_string_value(atime);
 
             struct tm parsedATime;
             memset(&parsedATime, 0, sizeof(parsedATime));
@@ -271,9 +268,9 @@ int fsh_getInfo(const char *path, struct Fsh_ObjectStat_s *file_info) {
             file_info->filesize = 0;
             LOG_DEBUG("path: %s, type: %s", path, json_string_value(type));
 
-            if (strcmp(json_string_value(type), "folder") == 0) {
+            if (strncmp(json_string_value(type), "folder",6) == 0) {
                 file_info->type = FSH_STAT_TYPE_FOLDER;
-            } else if (strcmp(json_string_value(type), "file") == 0) {
+            } else if (strncmp(json_string_value(type), "file",4) == 0) {
 
                 json_t *filesize = json_object_get(result_json, "size");
                 if (filesize && json_is_integer(filesize)) {
@@ -304,10 +301,7 @@ void fsh_container_destroy() {
         json_decref(pathInfo.jsonObjectRoot);
         pathInfo.jsonObjectRoot = NULL;
     }
-    if (pathInfo.path) {
-        FREE(pathInfo.path);
-        pathInfo.path = NULL;
-    }
+    FREE(pathInfo.path);
  
 
 }

@@ -23,8 +23,8 @@
 #include <errno.h>
 #include <signal.h>
 
-#include <alloc.h>
 #include <fused-shaperhub.h>
+#include <alloc.h>
 #include <messages.h>
 
 
