@@ -20,6 +20,6 @@
 typedef void (*showHelp_f)(const char *progname);
 
 
-int fsh_initFuse(int argc, char *argv[],showHelp_f showHelp);
+int fsh_shaperhub_initFuse(int argc, char *argv[],showHelp_f showHelp);
 void fsh_shaperhub_destroy(void);
 

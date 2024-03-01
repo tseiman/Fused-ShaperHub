@@ -25,28 +25,22 @@
 #include <fuse-dataloader.h>
 #include <messages.h>
 
-#ifdef IS_MOC
-#include "MOCFILE.h"
-
-MOC_DEMO_FILES;
-
-#endif
 
 int fsh_dirLoaderCallback(struct Fsh_DirLoaderRef_s *ref) {
     ref->filler(ref->buf, ref->filename, NULL, 0);
     return 0;
 }
 
-int fsh_dirLoader(struct Fsh_DirLoaderRef_s *ref) {
-    return fsh_walkFolders(fsh_dirLoaderCallback, ref);
+int fsh_fusedataloader_dirLoader(struct Fsh_DirLoaderRef_s *ref) {
+    return fsh_datacontainer_walkFolders(fsh_dirLoaderCallback, ref);
 }
 
 
-int fsh_fileOpener(const char *path) {
-
+int fsh_fusedataloader_fileOpener(const char *path) {
+	return fsh_datacontainer_openFile(path);
 }
 
-int fsh_FileLoader(const char *path, char *buf, size_t size, off_t offset) {
+int fsh_fusedataloader_fileLoader(const char *path, char *buf, size_t size, off_t offset) {
     LOG_DEBUG("READ data chunk with size %d at offet %ld file: >%s<", (int)size, offset, path);
 /*
 
@@ -89,16 +83,16 @@ int fsh_FileLoader(const char *path, char *buf, size_t size, off_t offset) {
 
 
 
-int fsh_statForPath(const char *path, struct stat *stbuf) {
+int fsh_fusedataloader_statForPath(const char *path, struct stat *stbuf) {
     struct Fsh_ObjectStat_s file_info;
 
 	LOG_DEBUG("working on >%s<", path);
 
-    if(fsh_getInfo(path, &file_info)) {
-        LOG_WARN("fsh_getInfo() returned an error condition: %s",path);
+    if(fsh_datacontainer_getInfo(path, &file_info)) {
+        LOG_WARN("fsh_datacontainer_getInfo() returned an error condition: %s",path);
 		return -1;
     }
-LOG_DEBUG("fsh_statForPath( %s)", path);
+LOG_DEBUG("fsh_fusedataloader_statForPath( %s)", path);
     switch(file_info.type) {
 	case FSH_STAT_TYPE_FOLDER:
 	    LOG_DEBUG("FOLDER with name addded: %s",path);
@@ -127,11 +121,11 @@ LOG_DEBUG("fsh_statForPath( %s)", path);
     return 0;
 }
 
-int fsh_LinkInfo(const char *path, char * linkDstPath, size_t size) {
-    return fsh_getLinkInfo(path,linkDstPath, size);
+int fsh_fusedataloader_linkInfo(const char *path, char * linkDstPath, size_t size) {
+    return fsh_datacontainer_getLinkInfo(path,linkDstPath, size);
 }
 
-void fsh_dataloader_destroy() {
+void fsh_fusedataloader_destroy() {
 	LOG_DEBUG("calling destroy chain");
-	fsh_container_destroy();
+	fsh_datacontainer_container_destroy();
 }

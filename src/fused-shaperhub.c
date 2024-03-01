@@ -46,7 +46,7 @@ static int getattr_callback(const char *path, struct stat *stbuf) {
         return 0;
     }
 
-    if (fsh_statForPath(path, stbuf)) {
+    if (fsh_fusedataloader_statForPath(path, stbuf)) {
         LOG_WARN("STAT fort Path failed");
         return -ENOENT;
     }
@@ -68,7 +68,7 @@ static int readdir_callback(const char *path, void *buf, fuse_fill_dir_t filler,
     dirLoaderRef.buf = buf;
     dirLoaderRef.filler = filler;
 
-    ret = fsh_dirLoader(&dirLoaderRef);
+    ret = fsh_fusedataloader_dirLoader(&dirLoaderRef);
     if (ret == 0)
         return 0;
 
@@ -77,18 +77,18 @@ static int readdir_callback(const char *path, void *buf, fuse_fill_dir_t filler,
 
 static int open_callback(const char *path, struct fuse_file_info *fi) { 
     (void)fi;
-    LOG_DEBUG(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> OPEN %s", path);
+    fsh_fusedataloader_fileOpener(path);
     return 0; 
 }
 
 static int read_callback(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
     LOG_DEBUG("Reading file callback %s", path);
-    return fsh_FileLoader(path,buf,size,offset);
+    return fsh_fusedataloader_fileLoader(path,buf,size,offset);
 }
 
 int readlink_callback(const char *path, char *buf, size_t size) {
     LOG_INFO("readlink_callback %s", path);
-    if (fsh_LinkInfo((const char *)path, buf, size)) {
+    if (fsh_fusedataloader_linkInfo((const char *)path, buf, size)) {
         return -ENOENT;
     }
     return 0;
@@ -105,7 +105,7 @@ static struct fuse_operations mount_fsh_operations = {
 extern int verbosity;
 extern int logColor;
 
-int fsh_initFuse(int argc, char *argv[], showHelp_f showHelp) {
+int fsh_shaperhub_initFuse(int argc, char *argv[], showHelp_f showHelp) {
 
     static struct options {
         int verbose;
@@ -155,5 +155,5 @@ int fsh_initFuse(int argc, char *argv[], showHelp_f showHelp) {
 
 void fsh_shaperhub_destroy() {
    	LOG_DEBUG("calling destroy chain");
-    fsh_dataloader_destroy();
+    fsh_fusedataloader_destroy();
 }

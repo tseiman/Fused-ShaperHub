@@ -121,7 +121,7 @@ int checkPathLen(char *str) {
  *      char *path                      --> the path of the folder
  *      MemoryStruct_t **responseBuffer --> 
  * ************************************************************************ **/
-int fsh_HTTPListPath(char *path, MemoryStruct_t **responseBuffer) {
+int fsh_httpconnector_ListPath(char *path, MemoryStruct_t **responseBuffer) {
 
     LOG_DEBUG("requesting >%s< from remote resource.", path);
 

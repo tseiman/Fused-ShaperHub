@@ -75,8 +75,8 @@ PathInfo_t *updatePathInfo(const char *path) {
         pathInfo.jsonObjectRoot = NULL;
     }
 
-    if (fsh_HTTPListPath(pathInfo.path, &httpResponseBuffer)) {
-        LOG_ERR("fsh_HTTPListPath() failed");
+    if (fsh_httpconnector_ListPath(pathInfo.path, &httpResponseBuffer)) {
+        LOG_ERR("fsh_httpconnector_ListPath() failed");
         goto ERROR;
     }
 
@@ -139,7 +139,7 @@ json_t *getSubElementByNamedPath(char *path, json_t *root) {
    return NULL;
 }
 
-int fsh_walkFolders(WalkFolders_Callback_t callback, struct Fsh_DirLoaderRef_s *ref) {
+int fsh_datacontainer_walkFolders(WalkFolders_Callback_t callback, struct Fsh_DirLoaderRef_s *ref) {
 
     LOG_DEBUG("Function entry with path >%s<", ref->path);
     PathInfo_t *pathInfo = NULL;
@@ -197,7 +197,7 @@ int fsh_walkFolders(WalkFolders_Callback_t callback, struct Fsh_DirLoaderRef_s *
     return 0;
 }
 
-int fsh_getInfo(const char *path, struct Fsh_ObjectStat_s *file_info) {
+int fsh_datacontainer_getInfo(const char *path, struct Fsh_ObjectStat_s *file_info) {
 
     LOG_DEBUG("working on >%s<", path);
 
@@ -290,12 +290,19 @@ int fsh_getInfo(const char *path, struct Fsh_ObjectStat_s *file_info) {
     return 0;
 }
 
-int fsh_getLinkInfo(const char *path, char *linkDstPath, size_t size) {
-    LOG_DEBUG("fsh_getLinkInfo %s", path);
+int fsh_datacontainer_getLinkInfo(const char *path, char *linkDstPath, size_t size) {
+    LOG_DEBUG("fsh_datacontainer_getLinkInfo %s", path);
     return 0;
 }
 
-void fsh_container_destroy() {
+
+
+int fsh_datacontainer_openFile(const char *path) {
+    	LOG_WARN("NOT IMPLEMENTED !!!!!!!!!! %s", path);
+
+}
+
+void fsh_datacontainer_container_destroy() {
   	LOG_DEBUG("calling destroy chain");
     if (pathInfo.jsonObjectRoot) {
         json_decref(pathInfo.jsonObjectRoot);

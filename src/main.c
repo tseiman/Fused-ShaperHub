@@ -48,7 +48,7 @@ int main(int argc, char **argv) {
     signal(SIGKILL, sig_handler);
     
 
-    fsh_initFuse(argc, argv, &show_help);
+    fsh_shaperhub_initFuse(argc, argv, &show_help);
 
 
     return 0;

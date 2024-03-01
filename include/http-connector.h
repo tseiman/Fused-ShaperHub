@@ -46,6 +46,6 @@ typedef struct  {
   size_t size;
 } MemoryStruct_t;
 
-int fsh_HTTPListPath(char *path, MemoryStruct_t **responseBuffer);
+int fsh_httpconnector_ListPath(char *path, MemoryStruct_t **responseBuffer);
 
 #endif
