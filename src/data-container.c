@@ -197,14 +197,12 @@ int fsh_datacontainer_walkFolders(WalkFolders_Callback_t callback, struct Fsh_Di
     return 0;
 }
 
-int fsh_datacontainer_getInfo(const char *path, struct Fsh_ObjectStat_s *file_info) {
-
-    LOG_DEBUG("working on >%s<", path);
-
+json_t *getActualSubelement(const char *path) {
 
     size_t bufferLen = strnlen(path, MAX_PATH_LEN) + 1;
+    json_t *result_json = NULL;
     char *tmpPath = MALLOC(bufferLen);
-    if(!tmpPath) return -1;
+    if(!tmpPath) return NULL;
     
     strncpy(tmpPath,path, bufferLen);
     for(int i = bufferLen - 1; i >= 0; --i) {
@@ -223,34 +221,52 @@ int fsh_datacontainer_getInfo(const char *path, struct Fsh_ObjectStat_s *file_in
  
     if (!pathInfo) {
         LOG_ERR("updatePathInfo() Failed");
-        return -2;
+        result_json = NULL;
+        goto ERROR;
     }
 
     json_t *root = pathInfo->jsonObjectRoot;
-    json_t *result_json;
 
     if (!root) {
         LOG_ERR("Data is not loaded");
-        return -1;
+        result_json = NULL;
+        goto ERROR;
     }
 
     tmpPath = MALLOC(strnlen(path, MAX_PATH_LEN) + 1);
-    MEMCHK(tmpPath) return -1;
+    MEMCHK(tmpPath) {
+        result_json = NULL;
+        goto ERROR;
+    }
 
     strcpy(tmpPath, path);
     result_json = getSubElementByNamedPath(basename(tmpPath) , root);
-    
-    FREE(tmpPath);
 
     if (!result_json) {
         LOG_WARN("getSubElementByNamedPath() retuned NULL, using path: %s", path);
-        return -2;
+        result_json = NULL;
+        goto ERROR;
     }
 
     if (!json_is_object(result_json)) {
         LOG_ERR("commit data is not an object");
-        return -3;
+        result_json = NULL;
+        goto ERROR;
     }
+
+ERROR:
+    FREE(tmpPath);
+
+    return result_json;
+}
+
+
+int fsh_datacontainer_getInfo(const char *path, struct Fsh_ObjectStat_s *file_info) {
+
+    LOG_DEBUG("working on >%s<", path);
+
+    json_t * result_json = getActualSubelement(path);
+    if (!result_json) return -1;
 
     json_t *type = json_object_get(result_json, "type");
     json_t *atime = json_object_get(result_json, "created");
@@ -296,9 +312,44 @@ int fsh_datacontainer_getLinkInfo(const char *path, char *linkDstPath, size_t si
 }
 
 
+typedef struct  {
+  char *buffer;
+  size_t size;
+} FileMemoryStruct_t;
 
-int fsh_datacontainer_openFile(const char *path) {
-    	LOG_WARN("NOT IMPLEMENTED !!!!!!!!!! %s", path);
+
+int fsh_datacontainer_openFile(const char *newPath) {
+    static char blobID[BLOB_ID_LEN];
+    static FileMemoryStruct_t file = {NULL, 0};
+    
+    LOG_DEBUG("Opening file >%s< ", newPath);
+
+    json_t * result_json = getActualSubelement(newPath);
+    if (!result_json) return -1;
+
+    json_t *blob = json_object_get(result_json, "blob");
+ 
+    if (!(blob && json_is_string(blob))) return -2;
+    
+
+    const char *newBlobID = json_string_value(blob);
+    LOG_DEBUG("Extracted a blob from curent Folder Structure data:  >%s<", newBlobID);
+
+
+    if(newBlobID && strncmp(newBlobID,blobID,BLOB_ID_LEN) == 0) { // MAY WE COMPARE AGAINST BLOB ID ! --> BETTER
+        LOG_DEBUG("File still in cache: >%s<", newPath);
+        UNIMPLEMENTED();
+        return 0;
+    }
+
+    FREE(file.buffer);
+    file.size = 0;
+
+    
+
+
+    UNIMPLEMENTED();
+    return 0;
 
 }
 

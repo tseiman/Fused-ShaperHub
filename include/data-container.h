@@ -20,17 +20,21 @@
 
 #include <fuse-dataloader.h>
 
-typedef int (*WalkFolders_Callback_t)(struct Fsh_DirLoaderRef_s *ref);
 
+#define BLOB_ID_LEN 128
+
+typedef int (*WalkFolders_Callback_t)(struct Fsh_DirLoaderRef_s *ref);
 
 typedef struct {
     json_t *jsonObjectRoot;
     char   *path;
 } PathInfo_t; 
 
+
+
 // int fsh_setupDataStructure(void);
 int fsh_datacontainer_walkFolders(WalkFolders_Callback_t callback, struct Fsh_DirLoaderRef_s *ref);
 int fsh_datacontainer_getInfo(const char *path,struct Fsh_ObjectStat_s *file_info);
-int fsh_datacontainer_openFile(const char *path);
+int fsh_datacontainer_openFile(const char *newPath);
 int fsh_datacontainer_getLinkInfo(const char *path, char * linkDstPath, size_t size);
 void fsh_datacontainer_container_destroy(void);

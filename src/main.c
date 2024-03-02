@@ -60,7 +60,7 @@ void sig_handler(int sig) {
     LOG_INFO("Received SIGTERM - cleaning up and exiting.");
     fsh_shaperhub_destroy();
     if(toFree = getAlloCounter()) {
-        LOG_WARN("Not all memory have been freed - still left: %d", toFree);
+        LOG_ERR("!!!!!!!!!! Not all memory have been freed - still left: %d !!!!!!!!!!!", toFree);
     }
     exit(0);
 }

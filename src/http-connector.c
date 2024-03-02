@@ -27,6 +27,8 @@
 #include <http-connector.h>
 
 #define BASEURL "http://localhost:3000"
+#define BLOBURL "http://localhost:3000/blobs"
+
 // #define MAX_PATH_LEN 512
 
 #define STRLEN(s) (sizeof(s) / sizeof(s[0]))
@@ -113,51 +115,26 @@ int checkPathLen(char *str) {
 }
 
 
-
 /** *************************************************************************
- * Requests the folder listing for a specific folder
+ * Generic HTTP GET
  * 
  * Parameter:
  *      char *path                      --> the path of the folder
- *      MemoryStruct_t **responseBuffer --> 
+ *      MemoryStruct_t **responseBuffer --> memory structure where ersult is copied to
  * ************************************************************************ **/
-int fsh_httpconnector_ListPath(char *path, MemoryStruct_t **responseBuffer) {
-
-    LOG_DEBUG("requesting >%s< from remote resource.", path);
-
+int httpGETRequest(char *url, MemoryStruct_t **responseBuffer) {
     CURL *curl;
     CURLcode res;
     int result = -1;
     MemoryStruct_t *chunk = MALLOC(sizeof(MemoryStruct_t));
+    LOG_DEBUG("HTTP GET for >%s<", url);
+
     if(!chunk) goto ERROR;
 
     chunk->memory = NULL; /* will be grown as needed by the realloc above */
     chunk->size = 0;           /* no data at this point */
 
-    char *escapedURLBuffer = NULL;
-    int newUrlSize = escapeURL(path, &escapedURLBuffer, strnlen(path,MAX_PATH_LEN));
-    if(!newUrlSize) {
-        LOG_ERR("Filed to escape URL");
-        result = -5;
-        goto ERROR;
-    }
-    
-    LOG_DEBUG("Escaped URL: >%s<", escapedURLBuffer);
 
-    size_t pathbuffer_len = strnlen(BASEURL,MAX_PATH_LEN) + strnlen(escapedURLBuffer,MAX_PATH_LEN - strnlen(BASEURL,MAX_PATH_LEN)) + 1;
-    char *pathbuffer = MALLOC(pathbuffer_len);
-    if(!pathbuffer) goto ERROR; 
-
-
-    if (checkPathLen(path)) {
-        result = -4;
-        goto ERROR;
-    }
-
-    strncpy(pathbuffer,BASEURL, pathbuffer_len);
-    strncat(pathbuffer, escapedURLBuffer, pathbuffer_len - STRLEN(BASEURL) + 1);
-
-    LOG_DEBUG("asembled path to: >%s<", pathbuffer);
 
     curl_global_init(CURL_GLOBAL_ALL);
     curl = curl_easy_init();
@@ -166,7 +143,7 @@ int fsh_httpconnector_ListPath(char *path, MemoryStruct_t **responseBuffer) {
         goto ERROR;
     }
 
-    curl_easy_setopt(curl, CURLOPT_URL, pathbuffer);
+    curl_easy_setopt(curl, CURLOPT_URL, url);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, chunk);                               // pass 'chunk' struct to the callback function
@@ -192,10 +169,109 @@ ERROR:
     FREE(chunk);
 
 EXIT:
-    FREE(pathbuffer);
-    FREE(escapedURLBuffer);
-   
     curl_global_cleanup();
-
     return result;
 }
+
+/** *************************************************************************
+ * Requests the folder listing for a specific folder
+ * 
+ * Parameter:
+ *      char *path                      --> the path of the folder
+ *      MemoryStruct_t **responseBuffer --> memory structure where ersult is copied to
+ * ************************************************************************ **/
+int fsh_httpconnector_ListPath(char *path, MemoryStruct_t **responseBuffer) {
+    int result = -1;
+    LOG_DEBUG("Listing files >%s< from remote resource.", path);
+
+
+    char *escapedURLBuffer = NULL;
+    int newUrlSize = escapeURL(path, &escapedURLBuffer, strnlen(path,MAX_PATH_LEN));
+    if(!newUrlSize) {
+        LOG_ERR("Filed to escape URL");
+        result = -5;
+        goto ERROR;
+    }
+    
+    LOG_DEBUG("Escaped URL: >%s<", escapedURLBuffer);
+
+    size_t pathbuffer_len = strnlen(BASEURL,MAX_PATH_LEN) + strnlen(escapedURLBuffer,MAX_PATH_LEN - strnlen(BASEURL,MAX_PATH_LEN)) + 1;
+    char *pathbuffer = MALLOC(pathbuffer_len);
+    if(!pathbuffer) goto ERROR; 
+
+
+    if (checkPathLen(path)) {
+        result = -4;
+        goto ERROR;
+    }
+
+    strncpy(pathbuffer,BASEURL, pathbuffer_len);
+    strncat(pathbuffer, escapedURLBuffer, pathbuffer_len - STRLEN(BASEURL));
+
+    LOG_DEBUG("asembled path to: >%s<", pathbuffer);
+
+
+
+    if (result = httpGETRequest(pathbuffer, responseBuffer)) {
+        LOG_ERR("httpGETRequest() failed");
+        goto ERROR;
+    }
+    
+    goto EXIT;
+ERROR:
+    LOG_ERR("Leaving in an error condition.");
+
+EXIT:
+    FREE(pathbuffer);
+    FREE(escapedURLBuffer);
+    return result;
+}
+
+
+/** *************************************************************************
+ * Requests the content of a specific file
+ * 
+ * Parameter:
+ *      char *path                      --> the full path with the file
+ *      MemoryStruct_t **responseBuffer --> memory structure where ersult is copied to
+ * ************************************************************************ **/
+int fsh_httpconnector_OpenFile(char *blobID, MemoryStruct_t **responseBuffer) {
+    int result = -1;
+    LOG_DEBUG("Loading content of file with blob >%s< from remote resource.", blobID);
+
+
+
+    size_t pathbuffer_len = strnlen(BLOBURL,MAX_PATH_LEN) + strnlen(blobID,MAX_PATH_LEN - strnlen(BLOBURL,MAX_PATH_LEN)) + 2; // +2 --> '\0' AND ADDITIONAL '/'
+    char *pathbuffer = MALLOC(pathbuffer_len);
+    if(!pathbuffer) goto ERROR; 
+
+
+    if (checkPathLen(blobID)) {
+        result = -4;
+        goto ERROR;
+    }
+
+    strncpy(pathbuffer,BLOBURL, pathbuffer_len);
+    strncat(pathbuffer, "/", pathbuffer_len - STRLEN(BLOBURL));
+    strncat(pathbuffer, blobID, pathbuffer_len - STRLEN(BLOBURL) -1);
+
+    LOG_DEBUG("asembled path to: >%s<", pathbuffer);
+
+
+
+    if (!(result = httpGETRequest(pathbuffer, responseBuffer))) {
+        LOG_ERR("httpGETRequest() failed");
+        goto ERROR;
+    }
+    
+    goto EXIT;
+ERROR:
+    LOG_ERR("Leaving in an error condition.");
+
+EXIT:
+    FREE(pathbuffer);
+    return result;
+}
+
+
+
