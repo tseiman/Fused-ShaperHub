@@ -25,14 +25,19 @@
 #include <time.h>
 
 
-#include <alloc.h>
-#include <data-container.h>
 #include <global.h>
-#include <http-connector.h>
+#include <alloc.h>
 #include <messages.h>
+#include <data-container.h>
+#include <http-connector.h>
+#include <open-file-manager.h>
 
-static PathInfo_t pathInfo = {NULL, NULL};
 
+
+static PathInfo_t loadedJsonPathInfo = {NULL, NULL};
+
+/* *********************************************************************** */
+/* *********************************************************************** */
 int comparePathLevel(char *a, char *b) {
     int i,j = 0;
     for (i=0; a[i]; a[i]=='/' ? i++ : *a++);
@@ -42,6 +47,10 @@ int comparePathLevel(char *a, char *b) {
 
 }
 
+
+
+/* *********************************************************************** */
+/* *********************************************************************** */
 PathInfo_t *updatePathInfo(const char *path) {
     
     MemoryStruct_t *httpResponseBuffer = NULL;
@@ -50,32 +59,32 @@ PathInfo_t *updatePathInfo(const char *path) {
 
     LOG_DEBUG("Entry with path >%s< ", path);
 
-    if ((!path) && pathInfo.jsonObjectRoot && pathInfo.path)
-        return &pathInfo; // if path is NULL but we've some info stored we return that
+    if ((!path) && loadedJsonPathInfo.jsonObjectRoot && loadedJsonPathInfo.path)
+        return &loadedJsonPathInfo; // if path is NULL but we've some info stored we return that
 
-    if (pathInfo.jsonObjectRoot && pathInfo.path) {
-        if (strncmp(path, pathInfo.path, MAX_PATH_LEN) == 0) { // Nothing to do as we have not changed the path, can work on the same JSON structure
+    if (loadedJsonPathInfo.jsonObjectRoot && loadedJsonPathInfo.path) {
+        if (strncmp(path, loadedJsonPathInfo.path, MAX_PATH_LEN) == 0) { // Nothing to do as we have not changed the path, can work on the same JSON structure
             LOG_DEBUG(">%s< already existing - return existing information", path);
-            return &pathInfo;
+            return &loadedJsonPathInfo;
         }
     }
 
     LOG_DEBUG("working now with path >%s< ", path);
 
-    FREE(pathInfo.path); // prevent allocating again on an already allocated memory
+    FREE(loadedJsonPathInfo.path); // prevent allocating again on an already allocated memory
 
-    size_t pathInfo_path_len = strnlen(path, MAX_PATH_LEN) + 1;
-    pathInfo.path =  MALLOC(pathInfo_path_len);
+    size_t pathInfo_path_len = ALLOC_PATH_STRLEN(path);
+    loadedJsonPathInfo.path =  MALLOC(pathInfo_path_len);
 
-    MEMCHK(pathInfo.path) goto ERROR;
-    strncpy(pathInfo.path, path, pathInfo_path_len);
+    MEMCHK(loadedJsonPathInfo.path) goto ERROR;
+    strncpy(loadedJsonPathInfo.path, path, pathInfo_path_len);
 
-    if (pathInfo.jsonObjectRoot) {
-        json_decref(pathInfo.jsonObjectRoot);
-        pathInfo.jsonObjectRoot = NULL;
+    if (loadedJsonPathInfo.jsonObjectRoot) {
+        json_decref(loadedJsonPathInfo.jsonObjectRoot);
+        loadedJsonPathInfo.jsonObjectRoot = NULL;
     }
 
-    if (fsh_httpconnector_ListPath(pathInfo.path, &httpResponseBuffer)) {
+    if (fsh_httpconnector_ListPath(loadedJsonPathInfo.path, &httpResponseBuffer)) {
         LOG_ERR("fsh_httpconnector_ListPath() failed");
         goto ERROR;
     }
@@ -84,14 +93,14 @@ PathInfo_t *updatePathInfo(const char *path) {
         LOG_ERR("Invalid httpResponseBuffer size : %zd", httpResponseBuffer->size);
         goto ERROR;
     }
-    LOG_DEBUG(" httpResponseBuffer size : %s/%zd/%s", pathInfo.path, httpResponseBuffer->size, httpResponseBuffer->memory);
-    if (!(pathInfo.jsonObjectRoot = json_loadb(httpResponseBuffer->memory, httpResponseBuffer->size, 0, &error))) {
+    LOG_DEBUG(" httpResponseBuffer size : %s/%zd/%s", loadedJsonPathInfo.path, httpResponseBuffer->size, httpResponseBuffer->memory);
+    if (!(loadedJsonPathInfo.jsonObjectRoot = json_loadb(httpResponseBuffer->memory, httpResponseBuffer->size, 0, &error))) {
         LOG_ERR("when loading JSON line:%d  error:%s ", error.line, error.text);
         goto ERROR;
     }
     LOG_DEBUG("returned buffer: %s", httpResponseBuffer->memory);
 
-    result = &pathInfo;
+    result = &loadedJsonPathInfo;
 
     goto EXIT;
    
@@ -108,6 +117,8 @@ EXIT:
 }
 
 
+/* *********************************************************************** */
+/* *********************************************************************** */
 json_t *getSubElementByNamedPath(char *path, json_t *root) {
     json_t *result_json;
     int i;
@@ -139,7 +150,9 @@ json_t *getSubElementByNamedPath(char *path, json_t *root) {
    return NULL;
 }
 
-int fsh_datacontainer_walkFolders(WalkFolders_Callback_t callback, struct Fsh_DirLoaderRef_s *ref) {
+/* *********************************************************************** */
+/* *********************************************************************** */
+int fsh_datacontainer_loadDir(WalkFolders_Callback_t callback, struct Fsh_DirLoaderRef_s *ref) {
 
     LOG_DEBUG("Function entry with path >%s<", ref->path);
     PathInfo_t *pathInfo = NULL;
@@ -149,7 +162,7 @@ int fsh_datacontainer_walkFolders(WalkFolders_Callback_t callback, struct Fsh_Di
         pathInfo = updatePathInfo(ref->path);
     } else {
         char *tmpPath = MALLOC(pathLen + 1);
-        if(!tmpPath) return -1;
+        MEMCHK(tmpPath) return -1;
 
         strncpy(tmpPath,ref->path, pathLen + 1);
         tmpPath[pathLen] = '/';
@@ -174,7 +187,7 @@ int fsh_datacontainer_walkFolders(WalkFolders_Callback_t callback, struct Fsh_Di
     }
 
     if (!json_is_array(root)) {
-        LOG_DEBUG("having single element no Array");
+        LOG_WARN("having single element no Array");
     }
 
     json_array_foreach(root, i, result_json) {
@@ -188,8 +201,7 @@ int fsh_datacontainer_walkFolders(WalkFolders_Callback_t callback, struct Fsh_Di
             if (path && type && name && json_is_string(type) && json_is_string(path) && json_is_string(name) ) {
                 ref->filename = json_string_value(name);
                 ref->path = json_string_value(path);
-                LOG_DEBUG("Calling callback for folder update");
-                callback(ref);
+                if(callback) callback(ref);
             }
         }
     }  /* END looping trough the current listing */
@@ -197,12 +209,22 @@ int fsh_datacontainer_walkFolders(WalkFolders_Callback_t callback, struct Fsh_Di
     return 0;
 }
 
+/*
+int fsh_datacontainer_loadDir(WalkFolders_Callback_t callback, struct Fsh_DirLoaderRef_s *ref) {
+    walkFolders(ref);
+    LOG_DEBUG("Calling callback for folder update");
+    callback(ref);
+}
+*/
+
+/* *********************************************************************** */
+/* *********************************************************************** */
 json_t *getActualSubelement(const char *path) {
 
-    size_t bufferLen = strnlen(path, MAX_PATH_LEN) + 1;
+    size_t bufferLen = ALLOC_PATH_STRLEN(path);
     json_t *result_json = NULL;
     char *tmpPath = MALLOC(bufferLen);
-    if(!tmpPath) return NULL;
+    MEMCHK(tmpPath) return NULL;
     
     strncpy(tmpPath,path, bufferLen);
     for(int i = bufferLen - 1; i >= 0; --i) {
@@ -232,15 +254,16 @@ json_t *getActualSubelement(const char *path) {
         result_json = NULL;
         goto ERROR;
     }
-
-    tmpPath = MALLOC(strnlen(path, MAX_PATH_LEN) + 1);
+    size_t pathLen = ALLOC_PATH_STRLEN(path);
+    tmpPath = MALLOC(pathLen);
     MEMCHK(tmpPath) {
         result_json = NULL;
         goto ERROR;
     }
+    strncpy(tmpPath, path,pathLen);
 
-    strcpy(tmpPath, path);
     result_json = getSubElementByNamedPath(basename(tmpPath) , root);
+    FREE(tmpPath);
 
     if (!result_json) {
         LOG_WARN("getSubElementByNamedPath() retuned NULL, using path: %s", path);
@@ -255,12 +278,14 @@ json_t *getActualSubelement(const char *path) {
     }
 
 ERROR:
-    FREE(tmpPath);
+    
 
     return result_json;
 }
 
 
+/* *********************************************************************** */
+/* *********************************************************************** */
 int fsh_datacontainer_getInfo(const char *path, struct Fsh_ObjectStat_s *file_info) {
 
     LOG_DEBUG("working on >%s<", path);
@@ -306,23 +331,16 @@ int fsh_datacontainer_getInfo(const char *path, struct Fsh_ObjectStat_s *file_in
     return 0;
 }
 
-int fsh_datacontainer_getLinkInfo(const char *path, char *linkDstPath, size_t size) {
-    LOG_DEBUG("fsh_datacontainer_getLinkInfo %s", path);
-    return 0;
-}
 
 
-typedef struct  {
-  char *buffer;
-  size_t size;
-} FileMemoryStruct_t;
 
-
+/* *********************************************************************** */
+/* *********************************************************************** */
 int fsh_datacontainer_openFile(const char *newPath) {
-    static char blobID[BLOB_ID_LEN];
-    static FileMemoryStruct_t file = {NULL, 0};
-    
-    LOG_DEBUG("Opening file >%s< ", newPath);
+    int result = -1;
+
+   
+    LOG_INFO("Opening file >%s< ", newPath);
 
     json_t * result_json = getActualSubelement(newPath);
     if (!result_json) return -1;
@@ -336,30 +354,174 @@ int fsh_datacontainer_openFile(const char *newPath) {
     LOG_DEBUG("Extracted a blob from curent Folder Structure data:  >%s<", newBlobID);
 
 
-    if(newBlobID && strncmp(newBlobID,blobID,BLOB_ID_LEN) == 0) { // MAY WE COMPARE AGAINST BLOB ID ! --> BETTER
-        LOG_DEBUG("File still in cache: >%s<", newPath);
-        UNIMPLEMENTED();
+
+    if(fsh_openfilemanager_getFileContext(newPath)) {
+        LOG_DEBUG("File already opened: >%s<", newPath);
         return 0;
     }
+    /*
+    if(newBlobID && strncmp(newBlobID,file->blobID,BLOB_ID_LEN) == 0) { 
+        LOG_DEBUG("File still in cache: >%s<", newPath);
+        return 0;
+    }
+*/
 
-    FREE(file.buffer);
-    file.size = 0;
 
-    
+    FileMemoryStruct_t *file = fsh_openfilemanager_openFile(newPath,newBlobID);
+/*
+    if(newBlobID && strncmp(newBlobID,file->blobID,BLOB_ID_LEN) == 0) { 
+        LOG_DEBUG("File still in cache: >%s<", newPath);
+        return 0;
+    }
+*/
+//    if(file->memory) FREE(file->memory->memory);
+ //   FREE(file->memory);
+ //   memset(file->blobID,0,BLOB_ID_LEN + 1);
+ //   strncpy(file->blobID,newBlobID,BLOB_ID_LEN + 1);
 
+    if (fsh_httpconnector_OpenFile(file->blobID, &file->memory)) {
+        LOG_ERR("fsh_httpconnector_OpenFile() failed");
+        goto ERROR;
+    }
 
-    UNIMPLEMENTED();
-    return 0;
+ERROR:
+    return result;
 
 }
 
+
+
+/* *********************************************************************** */
+/* *********************************************************************** */
+FileMemoryStruct_t *fsh_datacontainer_readFile(const char *newPath) {
+
+   FileMemoryStruct_t *result = NULL;
+
+   
+    LOG_DEBUG("read file >%s< ", newPath);
+
+    json_t * result_json = getActualSubelement(newPath);
+    if (!result_json) return result;
+
+    json_t *blob = json_object_get(result_json, "blob");
+ 
+    if (!(blob && json_is_string(blob))) return result;
+    
+
+    const char *newBlobID = json_string_value(blob);
+    LOG_DEBUG("Extracted a blob from curent Folder Structure data:  >%s<", newBlobID);
+
+    FileMemoryStruct_t *file = fsh_openfilemanager_getFileContext(newPath);
+
+    if(!file) {
+        LOG_ERR("fsh_openfilemanager_getFileContext returned in an error condition ! : >%s<", newPath);
+        return result;  
+    }
+
+    if( newBlobID && (strncmp(newBlobID,file->blobID,BLOB_ID_LEN) != 0)) { 
+        LOG_ERR("File was not opnend !!!!!: >%s<", newPath);
+        return result;
+    }
+
+    return file;
+}
+/* *********************************************************************** */
+/* *********************************************************************** */
+int fsh_datacontainer_createFile(const char *newFile) {
+    LOG_DEBUG("create new File file >%s< ", newFile);
+    int result = -1;
+    char timestamp[] = "YYYY-MM-ddTHH:mm:ss.SSS+0000";
+
+    char *tmpPath = MALLOC(ALLOC_PATH_STRLEN(newFile));
+    MEMCHK(tmpPath) {
+        result = 7;
+        goto ERROR;
+    }
+    strncpy(tmpPath, newFile, ALLOC_PATH_STRLEN(newFile));
+    char *tmpFile = MALLOC(ALLOC_PATH_STRLEN(newFile));
+    MEMCHK(tmpFile) {
+        result = 7;
+        goto ERROR;
+    }
+    strncpy(tmpFile, newFile, ALLOC_PATH_STRLEN(newFile));
+
+
+    char *pathName = dirname(tmpPath);
+    char *fileName = basename(tmpFile);
+
+    LOG_DEBUG("directory of new File file >%s< Filename of new file >%s<", pathName, fileName);
+
+    PathInfo_t *pathInfo = updatePathInfo(pathName);
+    
+    if (!pathInfo->jsonObjectRoot) goto ERROR;
+    
+
+
+    if (!pathInfo->jsonObjectRoot) {
+        LOG_ERR("Havent found path to create file");
+        goto ERROR;
+    }
+
+    if (!json_is_array(pathInfo->jsonObjectRoot)) {
+        LOG_WARN("having single element no Array");
+    }
+
+    time_t now;
+    time(&now);
+    strftime(timestamp, sizeof timestamp, "%FT%TZ", gmtime(&now));
+
+    json_t* newFileEntry = json_object();
+    json_object_set_new(newFileEntry, "path", json_string(pathName));
+    json_object_set_new(newFileEntry, "name", json_string(fileName));
+    json_object_set_new(newFileEntry, "type", json_string("file"));
+    json_object_set_new(newFileEntry, "size", json_integer(0));
+    json_object_set_new(newFileEntry, "created", json_string(timestamp));
+    json_object_set_new(newFileEntry, "modified", json_string(timestamp));
+    json_object_set_new(newFileEntry, "state", json_string("new"));
+
+    json_array_append(pathInfo->jsonObjectRoot ,newFileEntry);
+
+    result = 0;
+    goto EXIT;
+
+ERROR:
+    LOG_WARN("Leave create file in an error condition");
+EXIT:
+    json_decref(newFileEntry);
+    FREE(tmpPath);
+    FREE(tmpFile);
+    LOG_DEBUG("new file entry\n %s\n",json_dumps(pathInfo->jsonObjectRoot ,JSON_PRESERVE_ORDER));
+
+    return result;
+
+}
+
+
+/* *********************************************************************** */
+/* *********************************************************************** */
+int fsh_datacontainer_closeFile(const char *path) {
+    int result = -1;
+
+    UNIMPLEMENTED("need to implement HTTP transfer on close file"); 
+
+    
+    return fsh_openfilemanager_closeFile(path);
+}
+
+
+/* *********************************************************************** */
+/* *********************************************************************** */
 void fsh_datacontainer_container_destroy() {
   	LOG_DEBUG("calling destroy chain");
-    if (pathInfo.jsonObjectRoot) {
-        json_decref(pathInfo.jsonObjectRoot);
-        pathInfo.jsonObjectRoot = NULL;
+    if (loadedJsonPathInfo.jsonObjectRoot) {
+        json_decref(loadedJsonPathInfo.jsonObjectRoot);
+        loadedJsonPathInfo.jsonObjectRoot = NULL;
     }
-    FREE(pathInfo.path);
- 
+    FREE(loadedJsonPathInfo.path);
+
+    fsh_openfilemanager_closeAllFiles();
+
+//    if(file.memory) FREE(file.memory->memory);
+//    FREE(file.memory);
 
 }

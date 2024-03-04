@@ -34,6 +34,7 @@ const server = http.createServer(function (req, res) {
     var parsedData = {};
     if(file.type === 'json') { 
       parsedData = JSON.parse(data); 
+      data = JSON.stringify(parsedData[url]);
     } else {
       parsedData[url] = 1; // evil hack to sattisfy sanity check below
     }
@@ -49,6 +50,7 @@ const server = http.createServer(function (req, res) {
 
     
     res.writeHead(200, { 'Content-Type': file.mimetype });
+
     res.end(data);
   });
 

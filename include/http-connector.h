@@ -47,5 +47,6 @@ typedef struct  {
 } MemoryStruct_t;
 
 int fsh_httpconnector_ListPath(char *path, MemoryStruct_t **responseBuffer);
+int fsh_httpconnector_OpenFile(char *blobID, MemoryStruct_t **responseBuffer);
 
 #endif

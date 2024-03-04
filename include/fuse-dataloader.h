@@ -45,7 +45,9 @@ int fsh_fusedataloader_dirLoader(struct Fsh_DirLoaderRef_s *ref);
 int fsh_fusedataloader_statForPath(const char *path, struct stat *stbuf);
 int fsh_fusedataloader_linkInfo(const char *path, char * linkDstPath, size_t size);
 int fsh_fusedataloader_fileOpener(const char *path);
-int fsh_fusedataloader_fileLoader(const char *path, char *buf, size_t size, off_t offset);
+int fsh_fusedataloader_fileReader(const char *path, char *buf, size_t size, off_t offset);
+int fsh_fusedataloader_mknod(const char *path);
+int fsh_fusedataloader_releaseFile(const char *path);
 void fsh_fusedataloader_destroy(void);
 
 #endif

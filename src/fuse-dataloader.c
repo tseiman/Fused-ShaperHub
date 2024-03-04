@@ -17,6 +17,7 @@
 
 
 #include <string.h>
+#include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
 
@@ -31,8 +32,10 @@ int fsh_dirLoaderCallback(struct Fsh_DirLoaderRef_s *ref) {
     return 0;
 }
 
+
 int fsh_fusedataloader_dirLoader(struct Fsh_DirLoaderRef_s *ref) {
-    return fsh_datacontainer_walkFolders(fsh_dirLoaderCallback, ref);
+    fsh_datacontainer_loadDir(fsh_dirLoaderCallback, ref);
+	return 0;
 }
 
 
@@ -40,44 +43,22 @@ int fsh_fusedataloader_fileOpener(const char *path) {
 	return fsh_datacontainer_openFile(path);
 }
 
-int fsh_fusedataloader_fileLoader(const char *path, char *buf, size_t size, off_t offset) {
+int fsh_fusedataloader_fileReader(const char *path, char *buf, size_t size, off_t offset) {
     LOG_DEBUG("READ data chunk with size %d at offet %ld file: >%s<", (int)size, offset, path);
-/*
 
-    if (strcmp(path, filepath) == 0) {
-	size_t len = strlen(filecontent);
-	if (offset >= len) {
+	FileMemoryStruct_t *file = fsh_datacontainer_readFile(path);
+
+	if(!file) return -1;
+
+	if (offset >= file->memory->size) {
     	    return 0;
 	}
-
-	if (offset + size > len) {
-    	    memcpy(buf, filecontent + offset, len - offset);
-    	    return len - offset;
+	if (offset + size > file->memory->size) {
+    	    memcpy(buf, file->memory->memory + offset, file->memory->size - offset);
+    	    return file->memory->size - offset;
 	}
-
-	memcpy(buf, filecontent + offset, size);
+	memcpy(buf, file->memory->memory + offset, size);
 	return size;
-    }
-
-
-
-    if (strcmp(path, filepath1) == 0) {
-	size_t len = strlen(filecontent1);
-	if (offset >= len) {
-    	    return 0;
-	}
-
-	if (offset + size > len) {
-    	    memcpy(buf, filecontent1 + offset, len - offset);
-    	    return len - offset;
-	}
-
-	memcpy(buf, filecontent1 + offset, size);
-	return size;
-    }
-*/
-
-    return -ENOENT;
 
 }
 
@@ -88,16 +69,27 @@ int fsh_fusedataloader_statForPath(const char *path, struct stat *stbuf) {
 
 	LOG_DEBUG("working on >%s<", path);
 
+
+
+	stbuf->st_uid = getuid(); // The owner of the file/directory is the user who mounted the filesystem
+	stbuf->st_gid = getgid(); // The group of the file/directory is the same as the group of the user who mounted the filesystem
+	stbuf->st_atime = time( NULL ); // The last "a"ccess of the file/directory is right now
+	stbuf->st_mtime = time( NULL ); // The last "m"odification of the file/directory is right now
+	
+
+
     if(fsh_datacontainer_getInfo(path, &file_info)) {
         LOG_WARN("fsh_datacontainer_getInfo() returned an error condition: %s",path);
 		return -1;
     }
+
+
 LOG_DEBUG("fsh_fusedataloader_statForPath( %s)", path);
     switch(file_info.type) {
 	case FSH_STAT_TYPE_FOLDER:
 	    LOG_DEBUG("FOLDER with name addded: %s",path);
 	    stbuf->st_mode = S_IFDIR | 0755;
-	    stbuf->st_nlink = 1;
+	    stbuf->st_nlink = 2;
 	    stbuf->st_size = 4096;
 	    stbuf->st_atime = stbuf->st_mtime = stbuf->st_ctime = file_info.atime;
 	    break;
@@ -121,8 +113,12 @@ LOG_DEBUG("fsh_fusedataloader_statForPath( %s)", path);
     return 0;
 }
 
-int fsh_fusedataloader_linkInfo(const char *path, char * linkDstPath, size_t size) {
-    return fsh_datacontainer_getLinkInfo(path,linkDstPath, size);
+int fsh_fusedataloader_releaseFile(const char *path) {
+	return fsh_datacontainer_closeFile(path);
+}
+
+int fsh_fusedataloader_mknod(const char *path) {
+	return fsh_datacontainer_createFile(path);
 }
 
 void fsh_fusedataloader_destroy() {

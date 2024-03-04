@@ -35,6 +35,34 @@
 MOC_DEMO_FILES;
 #endif
 
+
+
+static void *init_callback(struct fuse_conn_info *conn) {
+    LOG_DEBUG("init_callback");
+    UNIMPLEMENTED("init callback not implemented yet");
+    return NULL;
+}
+
+
+static int mkdir_callback(const char *path, mode_t mode) {
+    LOG_DEBUG("mkdir_callback");
+    UNIMPLEMENTED("mkdir callback not implemented yet");
+    return 0;
+}
+
+static int rmdir_callback(const char *path) { 
+    LOG_DEBUG("rmdir_callback");
+    UNIMPLEMENTED("mkdir callback not implemented yet");
+    return 0;  
+}
+
+static int rename_callback(const char *from, const char *to) {
+    LOG_DEBUG("rename_callback");
+    UNIMPLEMENTED("rename callback not implemented yet");
+    return 0;  
+}
+
+
 static int getattr_callback(const char *path, struct stat *stbuf) {
     LOG_DEBUG("getattr_callback %s", path);
     memset(stbuf, 0, sizeof(struct stat));
@@ -53,6 +81,16 @@ static int getattr_callback(const char *path, struct stat *stbuf) {
 
     return 0;
 }
+
+
+static int setattr_callback(const char * path, const char *name, const char *value, size_t size,  int flags) { 
+    
+    LOG_DEBUG("setattr_callback path:%s, name:%s, value:%s, size:%zu, flags: %d",path,name,value , size, flags);
+    UNIMPLEMENTED("setattr callback not implemented yet");
+    return 0;
+}
+
+
 
 static int readdir_callback(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi) {
     LOG_DEBUG("readdir_callback %s", path);
@@ -75,6 +113,20 @@ static int readdir_callback(const char *path, void *buf, fuse_fill_dir_t filler,
     return -ENOENT;
 }
 
+static int create_callback(const char *path, mode_t mode, struct fuse_file_info *fi) {
+    LOG_DEBUG("create_callback");
+    UNIMPLEMENTED("create callback not implemented yet");
+    return 0;
+}
+
+static int mknod_callback(const char *path, mode_t mode, dev_t rdev) {
+    LOG_DEBUG("mknod_callback");
+    return fsh_fusedataloader_mknod(path);
+}
+
+
+
+
 static int open_callback(const char *path, struct fuse_file_info *fi) { 
     (void)fi;
     fsh_fusedataloader_fileOpener(path);
@@ -83,24 +135,91 @@ static int open_callback(const char *path, struct fuse_file_info *fi) {
 
 static int read_callback(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
     LOG_DEBUG("Reading file callback %s", path);
-    return fsh_fusedataloader_fileLoader(path,buf,size,offset);
+//    fsh_fusedataloader_fileOpener(path);
+    return fsh_fusedataloader_fileReader(path,buf,size,offset);
 }
 
-int readlink_callback(const char *path, char *buf, size_t size) {
-    LOG_INFO("readlink_callback %s", path);
-    if (fsh_fusedataloader_linkInfo((const char *)path, buf, size)) {
-        return -ENOENT;
-    }
-    return 0;
+static int write_callback(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi) { 
+    LOG_DEBUG("write_callback");
+    UNIMPLEMENTED("write callback not implemented yet");
+    return size;  
 }
+static int write_buf_callback(const char *path, struct fuse_bufvec *buf, off_t offset, struct fuse_file_info *fi) {
+    LOG_DEBUG("write_buf_callback");
+    UNIMPLEMENTED("write_buff callback not implemented yet");
+    return 0; 
+}
+
+static int truncate_callback(const char *path, off_t offset) { 
+    LOG_DEBUG("truncate_callback");
+    UNIMPLEMENTED("truncate callback not implemented yet");;
+    return 0; 
+}
+
+
+
+static int release_callback(const char *path, struct fuse_file_info *fi) { 
+    LOG_INFO("release_callback");
+    return fsh_fusedataloader_releaseFile(path);  
+}
+
+static int flush_callback(const char *path, struct fuse_file_info *fi) { 
+    LOG_DEBUG("flush_callback");
+    UNIMPLEMENTED("flush callback not implemented yet");
+    return 0;  
+}
+static int fsync_callback(const char *path, int datasync, struct fuse_file_info *fi) {
+    LOG_DEBUG("fsync_callback");
+    UNIMPLEMENTED("fsync callback not implemented yet");
+    return 0;  
+}
+
+static void destroy_callback(void *priv_data) { 
+    LOG_DEBUG("destroy_callback");
+    UNIMPLEMENTED("destroy callback not implemented yet");
+    return;  
+}
+
+static int chmod_callback(const char *path, mode_t mode) { return 0; } /* We do not do anything here - seems some editors like to fo chmod without "operation not permitted" */
+static int chown_callback(const char *path, uid_t uid, gid_t gid) {
+    LOG_DEBUG("chown_callback");
+    UNIMPLEMENTED("chown callback not implemented yet");
+    return 0;  
+}
+
+static int utime_callback(const char *path, struct utimbuf * time) {
+    LOG_DEBUG("utime_callback");
+    UNIMPLEMENTED("utime callback not implemented yet");
+    return 0;  
+}
+
+
+
 
 static struct fuse_operations mount_fsh_operations = {
-    .getattr = getattr_callback,
-    .open = open_callback,
-    .read = read_callback,
-    .readdir = readdir_callback,
-    .readlink = readlink_callback,
+  //  .init       = init_callback,
+    .mkdir      = mkdir_callback,
+ //   .rmdir      = rmdir_callback,
+  //  .rename     = rename_callback,
+    .getattr    = getattr_callback,
+    .readdir    = readdir_callback,
+        .mknod    = mknod_callback,
+ //   .create     = create_callback,
+    .open       = open_callback,
+    .read       = read_callback,
+    .write      = write_callback,
+//    .write_buf  = write_buf_callback,
+    .release    = release_callback,
+ //   .flush      = flush_callback,
+ //   .fsync      = fsync_callback,
+  //  .destroy    = destroy_callback,
+  .chmod = chmod_callback,
+//  .chown = chown_callback,
+//  .utime = utime_callback, 
+//  .truncate = truncate_callback, // << this would be needed for online editing
+//  .setxattr = setattr_callback,
 };
+
 
 extern int verbosity;
 extern int logColor;

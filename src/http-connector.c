@@ -54,7 +54,7 @@ size_t escapeURL(char * buffer, char **newBufferIn, size_t len) {
                                                                 // Some characters are expanded to %XX (Hex) 
                                                                 // - so initially the new buffer is minimum that long than old 
                                                                 
-    if(!newBuffer) return 0;
+    MEMCHK(newBuffer) return 0;
 
     for(int i; i <= newSize + 1; ++i) {
         if(URLEncodingLookup[buffer[i]]) {
@@ -129,7 +129,7 @@ int httpGETRequest(char *url, MemoryStruct_t **responseBuffer) {
     MemoryStruct_t *chunk = MALLOC(sizeof(MemoryStruct_t));
     LOG_DEBUG("HTTP GET for >%s<", url);
 
-    if(!chunk) goto ERROR;
+    MEMCHK(chunk) goto ERROR;
 
     chunk->memory = NULL; /* will be grown as needed by the realloc above */
     chunk->size = 0;           /* no data at this point */
@@ -197,7 +197,7 @@ int fsh_httpconnector_ListPath(char *path, MemoryStruct_t **responseBuffer) {
 
     size_t pathbuffer_len = strnlen(BASEURL,MAX_PATH_LEN) + strnlen(escapedURLBuffer,MAX_PATH_LEN - strnlen(BASEURL,MAX_PATH_LEN)) + 1;
     char *pathbuffer = MALLOC(pathbuffer_len);
-    if(!pathbuffer) goto ERROR; 
+    MEMCHK(pathbuffer) goto ERROR; 
 
 
     if (checkPathLen(path)) {
@@ -243,7 +243,7 @@ int fsh_httpconnector_OpenFile(char *blobID, MemoryStruct_t **responseBuffer) {
 
     size_t pathbuffer_len = strnlen(BLOBURL,MAX_PATH_LEN) + strnlen(blobID,MAX_PATH_LEN - strnlen(BLOBURL,MAX_PATH_LEN)) + 2; // +2 --> '\0' AND ADDITIONAL '/'
     char *pathbuffer = MALLOC(pathbuffer_len);
-    if(!pathbuffer) goto ERROR; 
+    MEMCHK(pathbuffer) goto ERROR; 
 
 
     if (checkPathLen(blobID)) {
@@ -258,12 +258,11 @@ int fsh_httpconnector_OpenFile(char *blobID, MemoryStruct_t **responseBuffer) {
     LOG_DEBUG("asembled path to: >%s<", pathbuffer);
 
 
-
-    if (!(result = httpGETRequest(pathbuffer, responseBuffer))) {
+    if (result = httpGETRequest(pathbuffer, responseBuffer)) {
         LOG_ERR("httpGETRequest() failed");
         goto ERROR;
-    }
-    
+    } 
+
     goto EXIT;
 ERROR:
     LOG_ERR("Leaving in an error condition.");

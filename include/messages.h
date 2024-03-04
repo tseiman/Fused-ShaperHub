@@ -88,6 +88,6 @@ extern int logColor;
 */
 #define DBG_PRINT() fprintf(stdout, "[DEBUG PRINT]  %s:%d)\n", __FILE_NAME__, __LINE__)
 
-#define UNIMPLEMENTED() fprintf(stdout, "%s ------------ UNIMPLEMENTED ------------ %s() in %s:%d)%s\n", COND_COLOR(ANSI_COLOR_CYAN), __FUNCTION_NAME__,__FILE_NAME__, __LINE__, COND_COLOR(ANSI_COLOR_RESET))
+#define UNIMPLEMENTED(cause) fprintf(stdout, "%s ------------ UNIMPLEMENTED because of \"%s\"------------ %s() in %s:%d)%s\n", COND_COLOR(ANSI_COLOR_CYAN), cause, __FUNCTION_NAME__,__FILE_NAME__, __LINE__, COND_COLOR(ANSI_COLOR_RESET))
 
 #endif

@@ -30,4 +30,6 @@ void *gcp_realloc(const char *funcName, void *p, size_t size, char* caller, unsi
 void gcp_free(const char *funcName, void *p, char* caller, unsigned int line );
 int getAlloCounter(void);
 
+#define ALLOC_PATH_STRLEN(path) (strnlen(path, MAX_PATH_LEN) + 1)
+
 #endif

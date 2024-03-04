@@ -50,6 +50,7 @@ set(SOURCES
     src/fuse-dataloader.c
     src/http-connector.c
     src/data-container.c
+    src/open-file-manager.c
     src/config.c
     src/alloc.c
     src/main.c
