@@ -49,6 +49,7 @@ int fsh_fusedataloader_fileReader(const char *path, char *buf, size_t size, off_
 	FileMemoryStruct_t *file = fsh_datacontainer_readFile(path);
 
 	if(!file) return -1;
+	if(!file->memory) return -1;
 
 	if (offset >= file->memory->size) {
     	    return 0;

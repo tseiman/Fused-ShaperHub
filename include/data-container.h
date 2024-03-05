@@ -37,6 +37,7 @@ typedef struct {
 typedef struct  {
     char blobID[BLOB_ID_LEN + 1];
     MemoryStruct_t *memory;
+    unsigned int referenceCount;
 } FileMemoryStruct_t;
 
 

@@ -359,25 +359,11 @@ int fsh_datacontainer_openFile(const char *newPath) {
         LOG_DEBUG("File already opened: >%s<", newPath);
         return 0;
     }
-    /*
-    if(newBlobID && strncmp(newBlobID,file->blobID,BLOB_ID_LEN) == 0) { 
-        LOG_DEBUG("File still in cache: >%s<", newPath);
-        return 0;
-    }
-*/
 
 
     FileMemoryStruct_t *file = fsh_openfilemanager_openFile(newPath,newBlobID);
-/*
-    if(newBlobID && strncmp(newBlobID,file->blobID,BLOB_ID_LEN) == 0) { 
-        LOG_DEBUG("File still in cache: >%s<", newPath);
-        return 0;
-    }
-*/
-//    if(file->memory) FREE(file->memory->memory);
- //   FREE(file->memory);
- //   memset(file->blobID,0,BLOB_ID_LEN + 1);
- //   strncpy(file->blobID,newBlobID,BLOB_ID_LEN + 1);
+
+    if(!file) goto ERROR;
 
     if (fsh_httpconnector_OpenFile(file->blobID, &file->memory)) {
         LOG_ERR("fsh_httpconnector_OpenFile() failed");
@@ -413,9 +399,13 @@ FileMemoryStruct_t *fsh_datacontainer_readFile(const char *newPath) {
 
     FileMemoryStruct_t *file = fsh_openfilemanager_getFileContext(newPath);
 
-    if(!file) {
+    int retryCounter = 0;
+    while(!file) {
         LOG_ERR("fsh_openfilemanager_getFileContext returned in an error condition ! : >%s<", newPath);
-        return result;  
+
+        file = fsh_openfilemanager_openFile(newPath,newBlobID);
+        if(retryCounter > 2) return result;  
+        ++retryCounter;
     }
 
     if( newBlobID && (strncmp(newBlobID,file->blobID,BLOB_ID_LEN) != 0)) { 

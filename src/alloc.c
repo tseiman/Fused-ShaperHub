@@ -48,6 +48,6 @@ void gcp_free(const char *funcName, void *p, char* caller, unsigned int line ) {
     }
 }
 
-int getAlloCounter() {
+int getAllocCounter() {
     return alloc_counter;
 }

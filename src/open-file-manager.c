@@ -1,5 +1,6 @@
 
 #include <string.h>
+#include <pthread.h>
 
 #include <global.h>
 #include <messages.h>
@@ -23,7 +24,8 @@ typedef struct  {
 */
 
 typedef struct OpenFileList {                   // simple linked list to maintain open files
-    char path[MAX_PATH_LEN];
+    char path[MAX_PATH_LEN +1];
+    size_t pathLen;
     struct OpenFileList *next;
     FileMemoryStruct_t *file;
 } OpenFileList_t;
@@ -33,13 +35,18 @@ size_t  openFiles = 0;
 
 FileMemoryStruct_t *fsh_openfilemanager_getFileContext(const char * path);
 
+pthread_mutex_t mutexLock = PTHREAD_MUTEX_INITIALIZER;
+
 FileMemoryStruct_t *fsh_openfilemanager_openFile(const char * path, const char * newBlobID) {
     
     FileMemoryStruct_t *fileCtx = NULL;
     if(fileCtx = fsh_openfilemanager_getFileContext(path)) {
         LOG_INFO("Denying double openeing of file >%s<, sending back existing context.",path);
+        ++fileCtx->referenceCount;
         return fileCtx;
     }
+
+    pthread_mutex_lock(&mutexLock);    
 
     ++openFiles;
     LOG_DEBUG("Register open file >%s<. Open are >%zu< now.", path, openFiles);
@@ -47,7 +54,11 @@ FileMemoryStruct_t *fsh_openfilemanager_openFile(const char * path, const char *
     OpenFileList_t *openedFile = MALLOC(sizeof(OpenFileList_t));
     MEMCHK(openedFile) goto ERROR;
 
+    LOG_DEBUG("File in list pointer %p", openedFile);
+
+    memset(openedFile->path,0,MAX_PATH_LEN + 1);
     strncpy(openedFile->path, path, MAX_PATH_LEN);
+    openedFile->pathLen = strnlen(path, MAX_PATH_LEN) + 1;
 
     FileMemoryStruct_t *file=MALLOC(sizeof(FileMemoryStruct_t));
     MEMCHK(file) goto ERROR;
@@ -56,6 +67,7 @@ FileMemoryStruct_t *fsh_openfilemanager_openFile(const char * path, const char *
     strncpy(file->blobID,newBlobID,BLOB_ID_LEN + 1);
 
     openedFile->file = file;
+    openedFile->file->referenceCount = 1;
     openedFile->next = firstOpenFile;
     firstOpenFile = openedFile;
 
@@ -66,21 +78,32 @@ ERROR:
     if(openedFile) FREE(openedFile->file);
     FREE(openedFile);
 EXIT:
+
+    pthread_mutex_unlock(&mutexLock);
     return result;
 }
+
 
 FileMemoryStruct_t *fsh_openfilemanager_getFileContext(const char * path) {
     OpenFileList_t *fileInList = firstOpenFile;
 
+    pthread_mutex_lock(&mutexLock);
+
     while(fileInList) {
-        if(strncmp(path, fileInList->path, MAX_PATH_LEN) == 0) {
-            LOG_DEBUG("Found file OPEN >%s<",path);
-            return fileInList->file;
+       if(fileInList->path) {
+            size_t pathLen = strnlen(path, MAX_PATH_LEN);
+
+            if(fileInList->path && (strncmp(path, fileInList->path, pathLen > fileInList->pathLen ? fileInList->pathLen : pathLen ) == 0)) {
+                LOG_DEBUG("Found file OPEN >%s<",path);
+                pthread_mutex_unlock(&mutexLock);
+                return fileInList->file;
+            }
         }
         fileInList = fileInList->next;
     }
 
-    LOG_WARN("Tried to check for an open file which is either closed or wasn't opened >%s<",path);
+    LOG_DEBUG("File wasn't opened negative result >%s<",path);
+    pthread_mutex_unlock(&mutexLock);
     return NULL;
 }
 
@@ -88,33 +111,58 @@ FileMemoryStruct_t *fsh_openfilemanager_getFileContext(const char * path) {
 int fsh_openfilemanager_closeFile(const char * path) {
     OpenFileList_t *fileInList = firstOpenFile;
     OpenFileList_t *previousFileInList = NULL;
+    int result = -1;
+
+    LOG_DEBUG("Attempt to close file >%s<", path);
+
+    pthread_mutex_lock(&mutexLock);
 
     while(fileInList) {
-        OpenFileList_t *tmpFileInListNext = firstOpenFile->next;
+        OpenFileList_t *tmpFileInListNext = fileInList->next;
+        if(fileInList->path) {
 
-        if(strncmp(path, fileInList->path, MAX_PATH_LEN) == 0) {
-            --openFiles;
-            LOG_DEBUG("Found file and CLOSING it locally >%s<, %zu still open",path, openFiles);
+            size_t pathLen = strnlen(path, MAX_PATH_LEN);
 
-            if(!previousFileInList) {
-                firstOpenFile = tmpFileInListNext;
-            } else {
-                previousFileInList->next = tmpFileInListNext;
-            }
+            if(strncmp(path, fileInList->path, pathLen > fileInList->pathLen ? fileInList->pathLen : pathLen) == 0) {
 
-            if(fileInList->file && fileInList->file->memory) FREE(fileInList->file->memory->memory);
-            if(fileInList->file) FREE(fileInList->file->memory);
-            FREE(fileInList->file);
-            FREE(fileInList);
 
-            return 0;
+                if(fileInList->file->referenceCount > 0) {
+                    LOG_DEBUG("Won't close file >%s< as there are still %d references", path, fileInList->file->referenceCount);
+                    result = 0;
+                    goto EXIT;
+                }
+                --fileInList->file->referenceCount;
+                --openFiles;
 
-        } else previousFileInList = fileInList;
+                LOG_DEBUG("Found file and CLOSING it locally >%s<, %zu still open",path, openFiles);
+
+                if(!previousFileInList) {
+                    firstOpenFile = tmpFileInListNext;
+                } else {
+                    previousFileInList->next = tmpFileInListNext;
+                }
+
+                if(fileInList->file) {
+                    if(fileInList->file->memory) FREE(fileInList->file->memory->memory);
+                    FREE(fileInList->file->memory);
+                }
+                FREE(fileInList->file);
+                FREE(fileInList);
+
+                result = 0;
+                goto EXIT;
+            } else previousFileInList = fileInList;
+        }
+
         fileInList = tmpFileInListNext;
     }
 
-    LOG_WARN("Tried to close a file which is either closed or wasn't opened >%s<",path);
-    return -1;
+    LOG_ERR("Tried to close a file which is either closed or wasn't opened >%s<",path);
+
+EXIT:
+ 
+    pthread_mutex_unlock(&mutexLock);
+    return result;
 }
 
 
@@ -122,8 +170,11 @@ int fsh_openfilemanager_closeFile(const char * path) {
 void fsh_openfilemanager_closeAllFiles(void) {
     OpenFileList_t *fileInList = firstOpenFile;
 
+    pthread_mutex_lock(&mutexLock);
+
     while(fileInList) {
-        OpenFileList_t *tmpFileInListNext = firstOpenFile->next;
+        OpenFileList_t *tmpFileInListNext = fileInList->next;
+        LOG_DEBUG("Attemp to clean up file >%s< still to clean %zu",fileInList->path, openFiles);
         --openFiles;
         
         if(fileInList->file && fileInList->file->memory) FREE(fileInList->file->memory->memory);
@@ -140,5 +191,6 @@ void fsh_openfilemanager_closeAllFiles(void) {
         LOG_INFO("Closed all files"); 
     }
 
+    pthread_mutex_unlock(&mutexLock);
 }
 

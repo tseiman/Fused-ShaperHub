@@ -25,15 +25,13 @@
 #include <sys/types.h>
 #include <time.h>
 
+#include <alloc.h>
 #include <fuse-dataloader.h>
 #include <fused-shaperhub.h>
 #include <global.h>
 #include <messages.h>
 
-#ifdef IS_MOC
-#include "MOCFILE.h"
-MOC_DEMO_FILES;
-#endif
+
 
 
 
@@ -174,11 +172,6 @@ static int fsync_callback(const char *path, int datasync, struct fuse_file_info 
     return 0;  
 }
 
-static void destroy_callback(void *priv_data) { 
-    LOG_DEBUG("destroy_callback");
-    UNIMPLEMENTED("destroy callback not implemented yet");
-    return;  
-}
 
 static int chmod_callback(const char *path, mode_t mode) { return 0; } /* We do not do anything here - seems some editors like to fo chmod without "operation not permitted" */
 static int chown_callback(const char *path, uid_t uid, gid_t gid) {
@@ -193,6 +186,15 @@ static int utime_callback(const char *path, struct utimbuf * time) {
     return 0;  
 }
 
+static void destroy_callback(void *priv_data) { 
+    LOG_INFO("Received SIGTERM - cleaning up and exiting.");
+    LOG_DEBUG("calling destroy chain");
+    fsh_fusedataloader_destroy();
+    int toFree;
+    if(toFree = getAllocCounter()) {
+        LOG_ERR("!!!!!!!!!! Not all memory have been freed - still left: %d !!!!!!!!!!!", toFree);
+    }
+}
 
 
 
@@ -212,7 +214,7 @@ static struct fuse_operations mount_fsh_operations = {
     .release    = release_callback,
  //   .flush      = flush_callback,
  //   .fsync      = fsync_callback,
-  //  .destroy    = destroy_callback,
+    .destroy    = destroy_callback,
   .chmod = chmod_callback,
 //  .chown = chown_callback,
 //  .utime = utime_callback, 
@@ -270,9 +272,4 @@ int fsh_shaperhub_initFuse(int argc, char *argv[], showHelp_f showHelp) {
     logColor = options.logColor;
     ret = fuse_main(args.argc, args.argv, &mount_fsh_operations, NULL);
     fuse_opt_free_args(&args);
-}
-
-void fsh_shaperhub_destroy() {
-   	LOG_DEBUG("calling destroy chain");
-    fsh_fusedataloader_destroy();
 }

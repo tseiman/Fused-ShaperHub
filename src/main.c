@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <signal.h>
+#include <pthread.h>
 
 #include <fused-shaperhub.h>
 #include <alloc.h>
@@ -40,27 +41,6 @@ static void show_help(const char *progname) {
 
 
 int main(int argc, char **argv) {
-
-
-
-    signal(SIGINT, sig_handler);
-    signal(SIGTERM, sig_handler);
-    signal(SIGKILL, sig_handler);
-    
-
     fsh_shaperhub_initFuse(argc, argv, &show_help);
-
-
     return 0;
-}
-
-
-void sig_handler(int sig) {
-    int toFree = 0;
-    LOG_INFO("Received SIGTERM - cleaning up and exiting.");
-    fsh_shaperhub_destroy();
-    if(toFree = getAlloCounter()) {
-        LOG_ERR("!!!!!!!!!! Not all memory have been freed - still left: %d !!!!!!!!!!!", toFree);
-    }
-    exit(0);
 }

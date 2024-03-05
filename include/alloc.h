@@ -28,7 +28,7 @@
 void *gcp_malloc(const char *funcName, size_t size, char* caller, unsigned int line );
 void *gcp_realloc(const char *funcName, void *p, size_t size, char* caller, unsigned int line );
 void gcp_free(const char *funcName, void *p, char* caller, unsigned int line );
-int getAlloCounter(void);
+int getAllocCounter(void);
 
 #define ALLOC_PATH_STRLEN(path) (strnlen(path, MAX_PATH_LEN) + 1)
 
