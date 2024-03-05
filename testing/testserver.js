@@ -8,53 +8,100 @@
 const http = require('http');
 const fs = require('fs');
 
-const server = http.createServer(function (req, res) {
-  var url = req.url;
-  var file = {
-    "type": "json",
-    "mimetype": "application/json",
-    "name": "./remoteFsModel.json"
+const filesystemModel = "./remoteFsModel.json";
+
+class Context {
+
+  parsedModelData = null;
+
+  constructor() {
+
+    console.log("Opening file: " + filesystemModel);
+
+    fs.readFile(filesystemModel, function (err, data) {
+      this.parsedModelData = JSON.parse(data);
+      if(err) {
+        console.err("Cant open File structure file", filesystemModel , err);
+        process.exit(1);
+      }
+      this.parsedModelData = JSON.parse(data);
+
+    }.bind(this));
   }
 
 
 
-  url = url.replace("//","/");
-  console.log("Reqest.URL: " + url);
+  getFolders(url,callback) {
 
-  if(url.match(/^\/blobs\/.*/)) {
-    file = {
-      "type": "svg",
-      "mimetype": "image/svg+xml",
-      "name": "./" + url + ".svg"
-    }
-  } 
-
-  console.log("Opening file: " + file.name);
-  fs.readFile(file.name, function (err, data) {
-    var parsedData = {};
-    if(file.type === 'json') { 
-      parsedData = JSON.parse(data); 
-      data = JSON.stringify(parsedData[url]);
-    } else {
-      parsedData[url] = 1; // evil hack to sattisfy sanity check below
-    }
-
-    if (err || parsedData[url] === undefined) {
-      console.error("Cant find URL:", url,err,parsedData[url]);
-      res.writeHead(404);
-      const body = [];
-      console.log(JSON.stringify(body));
-      res.end(JSON.stringify(body)); // JSON.stringify(err)
+    var context = {
+      "returncode": 200,
+      "mimetype": "application/json"
+    };
+    
+    if(this.parsedModelData[url] === undefined) {
+      console.error("Cant find URL:", url);
+      context.returncode = 404;
+      context.data = "[]";
+      callback(context);
       return;
     }
 
-    
-    res.writeHead(200, { 'Content-Type': file.mimetype });
+    context.data = JSON.stringify(this.parsedModelData[url]);
 
-    res.end(data);
-  });
+    callback(context);
+  }
+  
+  getBlob(url,callback) {
+    var filename = "./" + url + ".svg";
+    var context = {
+      "returncode": 200,
+      "mimetype": "image/svg+xml"
+    };
 
- 
+    fs.readFile(filename, function (err, data) {
+
+      if (err) {
+        console.error("Cant find URL:", url, err, parsedData[url]);
+        context.returncode = 404;
+        context.data = "";
+        callback(context);
+      }
+      
+      context.data = data;
+      callback(context);
+      return;    
+
+    });
+  }
+
+
+}
+
+
+
+var context = new Context();
+
+
+const server = http.createServer(function (req, res) {
+  var url = req.url;
+  var result = null;
+
+  
+  
+  var callback = function(context) {
+    res.writeHead(context.returncode, { 'Content-Type': context.mimetype });
+    res.end(context.data);
+  }
+
+
+  url = url.replace("//", "/");
+  console.log("Reqest.URL: " + url);
+
+  if (url.match(/^\/blobs\/.*/)) {
+    context.getBlob(url, callback);
+  } else {
+    context.getFolders(url, callback);
+  }
 
 });
 
