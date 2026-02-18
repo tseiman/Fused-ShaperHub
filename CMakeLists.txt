@@ -11,14 +11,39 @@ project(
     LANGUAGES C)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_FILE_OFFSET_BITS=64")
+
+#set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} \
+#-D_FILE_OFFSET_BITS=64 \
+#-DFUSE_USE_VERSION=26 \
+#-D_FORTIFY_SOURCE=2  \
+#-D_GLIBCXX_ASSERTIONS  \
+#-O2 \
+#-fasynchronous-unwind-tables  \
+#-fexceptions  \
+#-fno-omit-frame-pointer \
+#")
+
+
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} \
 -D_FILE_OFFSET_BITS=64 \
+-DFUSE_USE_VERSION=26 \
 -D_FORTIFY_SOURCE=2  \
 -D_GLIBCXX_ASSERTIONS  \
--O2 \
+-O0 -g \
 -fasynchronous-unwind-tables  \
 -fexceptions  \
+-fno-omit-frame-pointer \
 ")
+
+
+#set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} \
+#-D_FILE_OFFSET_BITS=64 \
+#-D_FORTIFY_SOURCE=2  \
+#-D_GLIBCXX_ASSERTIONS  \
+#-O2 \
+#-fasynchronous-unwind-tables  \
+#-fexceptions  \
+#")
 
 #-fpie  \
 #-pie -fpic \

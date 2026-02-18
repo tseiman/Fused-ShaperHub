@@ -23,9 +23,29 @@
 
 #define MAX_PATH_LEN 1024
 
+#ifndef TRUE 
 #define TRUE  (1==1)
-#define FALSE (!TRUE)
+#endif
 
+#ifndef FALSE
+#define FALSE (!TRUE)
+#endif
+
+
+#include <limits.h>
+
+#ifdef __APPLE__
+  #include <sys/syslimits.h>   // PATH_MAX auf macOS zuverlässig
+#endif
+
+#ifndef PATH_MAX
+  #define PATH_MAX 4096        // Fallback (sicherer Default)
+#endif
+
+// Dein Projekt-Makro:
+#ifndef MAX_PATH_LEN
+  #define MAX_PATH_LEN PATH_MAX
+#endif
 
 
 

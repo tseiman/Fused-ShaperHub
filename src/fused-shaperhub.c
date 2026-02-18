@@ -191,7 +191,7 @@ static void destroy_callback(void *priv_data) {
     LOG_DEBUG("calling destroy chain");
     fsh_fusedataloader_destroy();
     int toFree;
-    if(toFree = getAllocCounter()) {
+    if((toFree = getAllocCounter())) {
         LOG_ERR("!!!!!!!!!! Not all memory have been freed - still left: %d !!!!!!!!!!!", toFree);
     }
 }
@@ -244,7 +244,7 @@ int fsh_shaperhub_initFuse(int argc, char *argv[], showHelp_f showHelp) {
         FUSE_OPT_END
     };
 
-    int ret;
+    int ret = 0;
     struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 
     /* Set defaults -- we have to use strdup so that
@@ -272,4 +272,5 @@ int fsh_shaperhub_initFuse(int argc, char *argv[], showHelp_f showHelp) {
     logColor = options.logColor;
     ret = fuse_main(args.argc, args.argv, &mount_fsh_operations, NULL);
     fuse_opt_free_args(&args);
+    return ret;
 }

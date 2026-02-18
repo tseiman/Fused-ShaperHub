@@ -15,7 +15,7 @@
  ************************************************************************** */
 
 #include <jansson.h>
-#include <linux/limits.h>
+// #include <linux/limits.h>
 #include <string.h>
 #include <libgen.h>
 
@@ -125,21 +125,51 @@ json_t *getSubElementByNamedPath(char *path, json_t *root) {
 
     LOG_DEBUG("searching for subelement >%s<",path);
 
+    if (!path) {
+        LOG_ERR("path not set");
+        return NULL;
+    }
     if (!root) {
         LOG_ERR("can't walk through folders if data is not loaded");
         return NULL;
     }
+
     if (!json_is_array(root)) {
         LOG_DEBUG("having single element no Array");
     }
 
     json_array_foreach(root, i, result_json) {
 
-         json_t *name = json_object_get(result_json, "name");
+        if(result_json == NULL) {
+            LOG_ERR("json dataset error");
+            return NULL;
+        }
+
+
+        if (!json_is_object(result_json)) {
+            LOG_ERR("result_json is not an object, type=%d", json_typeof(result_json));
+            return NULL;
+        }
+
+        json_t *name = json_object_get(result_json, "name");
+
+        if(name == NULL) {
+            LOG_ERR("json dataset error");
+            return NULL;
+        }
+
 
         if (name && json_is_string(name)) {
             const char *objName = json_string_value(name);
             LOG_DEBUG("Comparing searched: >%s< to found: >%s<",path, objName);
+
+
+            if(objName == NULL) {
+                LOG_ERR("json dataset error");
+                return NULL;
+            }
+
+
             if(strncmp(path, objName, MAX_PATH_LEN) == 0) {
             
                 return result_json;
@@ -309,9 +339,17 @@ int fsh_datacontainer_getInfo(const char *path, struct Fsh_ObjectStat_s *file_in
             file_info->filesize = 0;
             LOG_DEBUG("path: %s, type: %s", path, json_string_value(type));
 
-            if (strncmp(json_string_value(type), "folder",6) == 0) {
+
+            const char *t = json_string_value(type);
+
+            if(t == NULL) {
+                LOG_ERR("JSON type not set");
+                return -101;
+            }
+
+            if (strncmp(t, "folder",6) == 0) {
                 file_info->type = FSH_STAT_TYPE_FOLDER;
-            } else if (strncmp(json_string_value(type), "file",4) == 0) {
+            } else if (strncmp(t, "file",4) == 0) {
 
                 json_t *filesize = json_object_get(result_json, "size");
                 if (filesize && json_is_integer(filesize)) {

@@ -40,7 +40,7 @@ pthread_mutex_t mutexLock = PTHREAD_MUTEX_INITIALIZER;
 FileMemoryStruct_t *fsh_openfilemanager_openFile(const char * path, const char * newBlobID) {
     
     FileMemoryStruct_t *fileCtx = NULL;
-    if(fileCtx = fsh_openfilemanager_getFileContext(path)) {
+    if((fileCtx = fsh_openfilemanager_getFileContext(path))) {
         LOG_INFO("Denying double openeing of file >%s<, sending back existing context.",path);
         ++fileCtx->referenceCount;
         return fileCtx;
@@ -90,10 +90,14 @@ FileMemoryStruct_t *fsh_openfilemanager_getFileContext(const char * path) {
     pthread_mutex_lock(&mutexLock);
 
     while(fileInList) {
-       if(fileInList->path) {
+//       if(fileInList->path[0] != '\0') {
+//        if(fileInList->path) {
+        if(fileInList) {
             size_t pathLen = strnlen(path, MAX_PATH_LEN);
 
-            if(fileInList->path && (strncmp(path, fileInList->path, pathLen > fileInList->pathLen ? fileInList->pathLen : pathLen ) == 0)) {
+//            if(fileInList->path && (strncmp(path, fileInList->path, pathLen > fileInList->pathLen ? fileInList->pathLen : pathLen ) == 0)) {
+
+            if(fileInList && (strncmp(path, fileInList->path, pathLen > fileInList->pathLen ? fileInList->pathLen : pathLen ) == 0)) {
                 LOG_DEBUG("Found file OPEN >%s<",path);
                 pthread_mutex_unlock(&mutexLock);
                 return fileInList->file;
@@ -119,11 +123,12 @@ int fsh_openfilemanager_closeFile(const char * path) {
 
     while(fileInList) {
         OpenFileList_t *tmpFileInListNext = fileInList->next;
-        if(fileInList->path) {
-
+//        if(fileInList->path[0] != '\0') {
+//        if(fileInList->path) {
+            if(fileInList) {
             size_t pathLen = strnlen(path, MAX_PATH_LEN);
-
-            if(strncmp(path, fileInList->path, pathLen > fileInList->pathLen ? fileInList->pathLen : pathLen) == 0) {
+            //if(strncmp(path, fileInList->path, pathLen > fileInList->pathLen ? fileInList->pathLen : pathLen) == 0) {
+            if(fileInList && strncmp(path, fileInList->path, pathLen > fileInList->pathLen ? fileInList->pathLen : pathLen) == 0) {
 
 
                 if(fileInList->file->referenceCount > 0) {

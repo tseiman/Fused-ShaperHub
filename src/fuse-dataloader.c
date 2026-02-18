@@ -44,7 +44,7 @@ int fsh_fusedataloader_fileOpener(const char *path) {
 }
 
 int fsh_fusedataloader_fileReader(const char *path, char *buf, size_t size, off_t offset) {
-    LOG_DEBUG("READ data chunk with size %d at offet %ld file: >%s<", (int)size, offset, path);
+    LOG_DEBUG("READ data chunk with size %d at offet %lld file: >%s<", (int)size, offset, path);
 
 	FileMemoryStruct_t *file = fsh_datacontainer_readFile(path);
 
@@ -85,17 +85,17 @@ int fsh_fusedataloader_statForPath(const char *path, struct stat *stbuf) {
     }
 
 
-LOG_DEBUG("fsh_fusedataloader_statForPath( %s)", path);
+	LOG_DEBUG("fsh_fusedataloader_statForPath( %s)", path);
     switch(file_info.type) {
 	case FSH_STAT_TYPE_FOLDER:
-	    LOG_DEBUG("FOLDER with name addded: %s",path);
+	    LOG_DEBUG("FOLDER with name added: %s",path);
 	    stbuf->st_mode = S_IFDIR | 0755;
 	    stbuf->st_nlink = 2;
 	    stbuf->st_size = 4096;
 	    stbuf->st_atime = stbuf->st_mtime = stbuf->st_ctime = file_info.atime;
 	    break;
 	case FSH_STAT_TYPE_FILE:
-	    LOG_DEBUG("FILE with name addded: %s",path);
+	    LOG_DEBUG("FILE with name added: %s",path);
 	    stbuf->st_mode = S_IFREG | 0644;
 	    stbuf->st_nlink = 1;
 	    stbuf->st_size = file_info.filesize;

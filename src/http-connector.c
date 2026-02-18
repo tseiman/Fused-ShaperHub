@@ -212,7 +212,7 @@ int fsh_httpconnector_ListPath(char *path, MemoryStruct_t **responseBuffer) {
 
 
 
-    if (result = httpGETRequest(pathbuffer, responseBuffer)) {
+    if ((result = httpGETRequest(pathbuffer, responseBuffer))) {
         LOG_ERR("httpGETRequest() failed");
         goto ERROR;
     }
@@ -258,7 +258,7 @@ int fsh_httpconnector_OpenFile(char *blobID, MemoryStruct_t **responseBuffer) {
     LOG_DEBUG("asembled path to: >%s<", pathbuffer);
 
 
-    if (result = httpGETRequest(pathbuffer, responseBuffer)) {
+    if ((result = httpGETRequest(pathbuffer, responseBuffer))) {
         LOG_ERR("httpGETRequest() failed");
         goto ERROR;
     } 
