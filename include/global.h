@@ -47,7 +47,8 @@
   #define MAX_PATH_LEN PATH_MAX
 #endif
 
-static pthread_mutex_t g_model_lock = PTHREAD_MUTEX_INITIALIZER;
+/* g_model_lock removed: open-file-manager uses its own internal mutex (ofm_lock).
+ * No shared mutex is needed at this layer. */
 
 
 

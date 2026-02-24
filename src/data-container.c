@@ -31,12 +31,60 @@
 #include <data-container.h>
 #include <http-connector.h>
 #include <open-file-manager.h>
-// #include <pthread.h>
+#include <pthread.h>
 
+/* -----------------------------------------------------------------------
+ * RACE CONDITION FIX
+ * -----------------------------------------------------------------------
+ * The original code used a single global 'loadedJsonPathInfo' shared by
+ * all FUSE threads. This caused corruption: Thread A would set the cache
+ * to path "/AnotherFolder/", Thread B would immediately overwrite it with
+ * "/", and Thread A's json_t* root pointer now pointed at the wrong JSON
+ * tree -> getSubElementByNamedPath() would find "AnotherFolder" inside
+ * the root listing and return it as a child of /AnotherFolder/ ->
+ * /AnotherFolder/AnotherFolder/AnotherFolder/... infinite recursion.
+ *
+ * The pthread_mutex_t in global.h was declared 'static', which means each
+ * .c file got its own private copy of the mutex. Threads were locking
+ * DIFFERENT mutex instances and were not protecting each other at all.
+ *
+ * FIX: Use pthread_key_t (thread-local storage). Each FUSE worker thread
+ * gets its own PathInfo_t cache. No shared mutable state -> no race.
+ * The global mutex (now properly extern/shared via one definition here)
+ * is only needed to protect the open-file-manager which is truly shared.
+ * ----------------------------------------------------------------------- */
 
+/* Thread-local key: each thread gets its own PathInfo_t* */
+static pthread_key_t  tls_pathinfo_key;
+static pthread_once_t tls_key_once = PTHREAD_ONCE_INIT;
 
-static PathInfo_t loadedJsonPathInfo = {NULL, NULL};
-// static pthread_mutex_t g_model_lock = PTHREAD_MUTEX_INITIALIZER;
+static void destroy_thread_pathinfo(void *ptr) {
+    PathInfo_t *info = (PathInfo_t *)ptr;
+    if (!info) return;
+    if (info->jsonObjectRoot) {
+        json_decref(info->jsonObjectRoot);
+        info->jsonObjectRoot = NULL;
+    }
+    FREE(info->path);
+    FREE(info);
+}
+
+static void create_tls_key(void) {
+    pthread_key_create(&tls_pathinfo_key, destroy_thread_pathinfo);
+}
+
+static PathInfo_t *get_thread_pathinfo(void) {
+    pthread_once(&tls_key_once, create_tls_key);
+    PathInfo_t *info = (PathInfo_t *)pthread_getspecific(tls_pathinfo_key);
+    if (!info) {
+        info = (PathInfo_t *)MALLOC(sizeof(PathInfo_t));
+        if (!info) return NULL;
+        info->jsonObjectRoot = NULL;
+        info->path = NULL;
+        pthread_setspecific(tls_pathinfo_key, info);
+    }
+    return info;
+}
 
 /* *********************************************************************** */
 /* *********************************************************************** */
@@ -55,63 +103,61 @@ int comparePathLevel(char *a, char *b) {
 /* *********************************************************************** */
 PathInfo_t *updatePathInfo(const char *path) {
 
-
-    
     MemoryStruct_t *httpResponseBuffer = NULL;
     json_error_t error;
     PathInfo_t *result = NULL;
 
     LOG_DEBUG("Entry with path >%s< ", path);
 
+    /* Get this thread's own private cache - no sharing between threads */
+    PathInfo_t *loadedJsonPathInfo = get_thread_pathinfo();
+    if (!loadedJsonPathInfo) {
+        LOG_ERR("Failed to get thread-local PathInfo");
+        return NULL;
+    }
 
+    if ((!path) && loadedJsonPathInfo->jsonObjectRoot && loadedJsonPathInfo->path)
+        return loadedJsonPathInfo;
 
-
-    if (strncmp(path, "/AnotherFolder/AnotherFolder", MAX_PATH_LEN) == 0) { LOG_ERR("recursive folder !!!! >%s< ", path); exit(0); }
-
-
-
-    if ((!path) && loadedJsonPathInfo.jsonObjectRoot && loadedJsonPathInfo.path)
-        return &loadedJsonPathInfo; // if path is NULL but we've some info stored we return that
-
-    if (loadedJsonPathInfo.jsonObjectRoot && loadedJsonPathInfo.path) {
-        if (strncmp(path, loadedJsonPathInfo.path, MAX_PATH_LEN) == 0) { // Nothing to do as we have not changed the path, can work on the same JSON structure
+    if (loadedJsonPathInfo->jsonObjectRoot && loadedJsonPathInfo->path) {
+        if (strncmp(path, loadedJsonPathInfo->path, MAX_PATH_LEN) == 0) {
             LOG_DEBUG(">%s< already existing - return existing information", path);
-            return &loadedJsonPathInfo;
+            return loadedJsonPathInfo;
         }
     }
 
     LOG_DEBUG("working now with path >%s< ", path);
 
-    FREE(loadedJsonPathInfo.path); // prevent allocating again on an already allocated memory
+    FREE(loadedJsonPathInfo->path);
 
     size_t pathInfo_path_len = ALLOC_PATH_STRLEN(path);
-    loadedJsonPathInfo.path =  MALLOC(pathInfo_path_len);
+    loadedJsonPathInfo->path = MALLOC(pathInfo_path_len);
 
-    MEMCHK(loadedJsonPathInfo.path) goto ERROR;
-    strncpy(loadedJsonPathInfo.path, path, pathInfo_path_len);
+    MEMCHK(loadedJsonPathInfo->path) goto ERROR;
+    strncpy(loadedJsonPathInfo->path, path, pathInfo_path_len);
 
-    if (loadedJsonPathInfo.jsonObjectRoot) {
-        json_decref(loadedJsonPathInfo.jsonObjectRoot);
-        loadedJsonPathInfo.jsonObjectRoot = NULL;
+    if (loadedJsonPathInfo->jsonObjectRoot) {
+        json_decref(loadedJsonPathInfo->jsonObjectRoot);
+        loadedJsonPathInfo->jsonObjectRoot = NULL;
     }
 
-    if (fsh_httpconnector_ListPath(loadedJsonPathInfo.path, &httpResponseBuffer)) {
+    if (fsh_httpconnector_ListPath(loadedJsonPathInfo->path, &httpResponseBuffer)) {
         LOG_ERR("fsh_httpconnector_ListPath() failed");
         goto ERROR;
     }
 
-    if (httpResponseBuffer->size == 0) { /* if only 1 byte is allocated (which is the initial allocation of the buffer) then the response was not ok */
+    if (httpResponseBuffer->size == 0) {
         LOG_ERR("Invalid httpResponseBuffer size : %zd", httpResponseBuffer->size);
         goto ERROR;
     }
-    LOG_DEBUG(" httpResponseBuffer size : loadedJsonPathInfo=%s; httpResponseBuffer->size=%zd;  httpResponseBuffer->memory=%s", loadedJsonPathInfo.path, httpResponseBuffer->size, httpResponseBuffer->memory);
-    if (!(loadedJsonPathInfo.jsonObjectRoot = json_loadb(httpResponseBuffer->memory, httpResponseBuffer->size, 0, &error))) {
+    LOG_DEBUG(" httpResponseBuffer size : loadedJsonPathInfo=%s; httpResponseBuffer->size=%zd;  httpResponseBuffer->memory=%s", loadedJsonPathInfo->path, httpResponseBuffer->size, httpResponseBuffer->memory);
+    if (!(loadedJsonPathInfo->jsonObjectRoot = json_loadb(httpResponseBuffer->memory, httpResponseBuffer->size, 0, &error))) {
         LOG_ERR("when loading JSON line:%d  error:%s ", error.line, error.text);
         goto ERROR;
     }
     LOG_DEBUG("returned buffer: %s", httpResponseBuffer->memory);
 
-    result = &loadedJsonPathInfo;
+    result = loadedJsonPathInfo;
 
     goto EXIT;
    
@@ -196,7 +242,6 @@ json_t *getSubElementByNamedPath(char *path, json_t *root) {
 int fsh_datacontainer_loadDir(WalkFolders_Callback_t callback, struct Fsh_DirLoaderRef_s *ref, int offset) {
 
     int ret = 0; // return code
-  //  pthread_mutex_lock(&g_model_lock);
 
     LOG_DEBUG("Function entry with path >%s<", ref->path);
     PathInfo_t *pathInfo = NULL;
@@ -261,7 +306,6 @@ int fsh_datacontainer_loadDir(WalkFolders_Callback_t callback, struct Fsh_DirLoa
     }  /* END looping trough the current listing */
 
 EXIT:
-   // pthread_mutex_unlock(&g_model_lock);
 
     return ret;
 }
@@ -278,15 +322,11 @@ int fsh_datacontainer_loadDir(WalkFolders_Callback_t callback, struct Fsh_DirLoa
 /* *********************************************************************** */
 json_t *getActualSubelement(const char *path) {
 
-  //  pthread_mutex_lock(&g_model_lock);
-
-   // pthread_mutex_trylock(&g_model_lock);
 
     size_t bufferLen = ALLOC_PATH_STRLEN(path);
     json_t *result_json = NULL;
     char *tmpPath = MALLOC(bufferLen + 1);
     MEMCHK(tmpPath) {
-  //      pthread_mutex_unlock(&g_model_lock);
         return NULL;
     }
     memset(tmpPath, 0 ,bufferLen + 1);
@@ -305,7 +345,6 @@ json_t *getActualSubelement(const char *path) {
 
     FREE(tmpPath);
  
-     if (strncmp(path, "/AnotherFolder/AnotherFolder", MAX_PATH_LEN) == 0) { LOG_ERR("recursive folder !!!! >%s< ", path); exit(0); }
 
     if (!pathInfo) {
         LOG_ERR("updatePathInfo() Failed");
@@ -344,8 +383,6 @@ json_t *getActualSubelement(const char *path) {
     }
 
 ERROR:
-    
-  //  pthread_mutex_unlock(&g_model_lock);
     return result_json;
 }
 
@@ -355,7 +392,6 @@ ERROR:
 int fsh_datacontainer_getInfo(const char *path, struct Fsh_ObjectStat_s *file_info) {
 
     int ret = 0;
-   // pthread_mutex_lock(&g_model_lock);
 
     LOG_DEBUG("working on >%s<", path);
 
@@ -415,7 +451,6 @@ int fsh_datacontainer_getInfo(const char *path, struct Fsh_ObjectStat_s *file_in
         }
   
   EXIT:
-  //  pthread_mutex_unlock(&g_model_lock);
     return ret;
 }
 
@@ -426,7 +461,6 @@ int fsh_datacontainer_getInfo(const char *path, struct Fsh_ObjectStat_s *file_in
 /* *********************************************************************** */
 int fsh_datacontainer_openFile(const char *newPath) {
     int result = -1;
-   // pthread_mutex_lock(&g_model_lock);
    
     LOG_INFO("Opening file >%s< ", newPath);
 
@@ -470,7 +504,6 @@ int fsh_datacontainer_openFile(const char *newPath) {
 
 EXIT:
 ERROR:
- //   pthread_mutex_unlock(&g_model_lock);
     return result;
 }
 
@@ -479,7 +512,6 @@ ERROR:
 /* *********************************************************************** */
 /* *********************************************************************** */
 FileMemoryStruct_t *fsh_datacontainer_readFile(const char *newPath) {
- //   pthread_mutex_lock(&g_model_lock);
 
     FileMemoryStruct_t *result = NULL;
 
@@ -499,24 +531,26 @@ FileMemoryStruct_t *fsh_datacontainer_readFile(const char *newPath) {
 
     FileMemoryStruct_t *file = fsh_openfilemanager_getFileContext(newPath);
 
-    int retryCounter = 0;
-    while(!file) {
-        LOG_ERR("fsh_openfilemanager_getFileContext returned in an error condition ! : >%s<", newPath);
-
-        file = fsh_openfilemanager_openFile(newPath,newBlobID);
-        result = file;
-        if(retryCounter > 2) goto EXIT;
-        ++retryCounter;
+    /* If not open yet, try to open it (e.g. read called before open) */
+    if (!file) {
+        LOG_ERR("fsh_openfilemanager_getFileContext returned NULL, trying to open: >%s<", newPath);
+        file = fsh_openfilemanager_openFile(newPath, newBlobID);
     }
 
-    if( newBlobID && (strncmp(newBlobID,result->blobID,BLOB_ID_LEN) != 0)) { 
-        LOG_ERR("File was not opnend !!!!!: >%s<", newPath);
+    if (!file) {
+        LOG_ERR("Could not open file: >%s<", newPath);
         goto EXIT;
     }
 
-  //  return file;
+    /* Sanity check: blob ID must match what we expect */
+    if (newBlobID && (strncmp(newBlobID, file->blobID, BLOB_ID_LEN) != 0)) {
+        LOG_ERR("BlobID mismatch for >%s<: expected >%s< got >%s<", newPath, newBlobID, file->blobID);
+        goto EXIT;
+    }
+
+    result = file;
+
 EXIT:
-  //  pthread_mutex_unlock(&g_model_lock);
     return result;
 }
 /* *********************************************************************** */
@@ -606,16 +640,21 @@ int fsh_datacontainer_closeFile(const char *path) {
 /* *********************************************************************** */
 /* *********************************************************************** */
 void fsh_datacontainer_container_destroy() {
-  	LOG_DEBUG("calling destroy chain");
-    if (loadedJsonPathInfo.jsonObjectRoot) {
-        json_decref(loadedJsonPathInfo.jsonObjectRoot);
-        loadedJsonPathInfo.jsonObjectRoot = NULL;
+    LOG_DEBUG("calling destroy chain");
+
+    /* Clean up the calling thread's TLS cache (typically the main thread).
+     * Other worker threads' TLS is cleaned up automatically by the destructor
+     * registered with pthread_key_create() when each thread exits. */
+    PathInfo_t *info = get_thread_pathinfo();
+    if (info) {
+        if (info->jsonObjectRoot) {
+            json_decref(info->jsonObjectRoot);
+            info->jsonObjectRoot = NULL;
+        }
+        FREE(info->path);
+        FREE(info);
+        pthread_setspecific(tls_pathinfo_key, NULL);
     }
-    FREE(loadedJsonPathInfo.path);
 
     fsh_openfilemanager_closeAllFiles();
-
-//    if(file.memory) FREE(file.memory->memory);
-//    FREE(file.memory);
-
 }

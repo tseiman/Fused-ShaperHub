@@ -64,7 +64,6 @@ static int rename_callback(const char *from, const char *to) {
 static int getattr_callback(const char *path, struct stat *stbuf) {
     LOG_DEBUG("getattr_callback %s", path);
 
-    pthread_mutex_lock(&g_model_lock);
 
     memset(stbuf, 0, sizeof(struct stat));
 
@@ -72,17 +71,14 @@ static int getattr_callback(const char *path, struct stat *stbuf) {
         stbuf->st_mode = S_IFDIR | 0755;
         stbuf->st_nlink = 1;
         stbuf->st_atime = stbuf->st_mtime = stbuf->st_ctime = time(NULL);
-        pthread_mutex_unlock(&g_model_lock);
         return 0;
     }
 
     if (fsh_fusedataloader_statForPath(path, stbuf)) {
         LOG_WARN("STAT fort Path failed");
-        pthread_mutex_unlock(&g_model_lock);
         return -ENOENT;
     }
 
-    pthread_mutex_unlock(&g_model_lock);
     return 0;
 }
 
@@ -99,7 +95,6 @@ static int setattr_callback(const char * path, const char *name, const char *val
 static int readdir_callback(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi) {
     LOG_DEBUG("readdir_callback %s", path);
  //   (void)offset;
-    pthread_mutex_lock(&g_model_lock);
     (void)fi;
     int ret;
     struct Fsh_DirLoaderRef_s dirLoaderRef;
@@ -113,11 +108,9 @@ static int readdir_callback(const char *path, void *buf, fuse_fill_dir_t filler,
 
     ret = fsh_fusedataloader_dirLoader(&dirLoaderRef, offset);
     if (ret == 0) {
-    pthread_mutex_unlock(&g_model_lock);
         return 0;
     }
 
-    pthread_mutex_unlock(&g_model_lock);
     return -ENOENT;
 }
 
@@ -130,9 +123,7 @@ static int create_callback(const char *path, mode_t mode, struct fuse_file_info 
 static int mknod_callback(const char *path, mode_t mode, dev_t rdev) {
     LOG_DEBUG("mknod_callback");
 
-    pthread_mutex_lock(&g_model_lock);
     int res = fsh_fusedataloader_mknod(path);
-    pthread_mutex_unlock(&g_model_lock);
 
     return res;
 }
@@ -142,18 +133,15 @@ static int mknod_callback(const char *path, mode_t mode, dev_t rdev) {
 
 static int open_callback(const char *path, struct fuse_file_info *fi) { 
     (void)fi;
-    pthread_mutex_lock(&g_model_lock);
     fsh_fusedataloader_fileOpener(path);
-    pthread_mutex_unlock(&g_model_lock);    
+
     return 0; 
 }
 
 static int read_callback(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
     LOG_DEBUG("Reading file callback %s", path);
 //    fsh_fusedataloader_fileOpener(path);
-    pthread_mutex_lock(&g_model_lock);
     int res = fsh_fusedataloader_fileReader(path,buf,size,offset);
-    pthread_mutex_unlock(&g_model_lock);
     return res;
 }
 
@@ -179,9 +167,7 @@ static int truncate_callback(const char *path, off_t offset) {
 static int release_callback(const char *path, struct fuse_file_info *fi) { 
     LOG_INFO("release_callback");
 
-    pthread_mutex_lock(&g_model_lock);
     int res = fsh_fusedataloader_releaseFile(path);  
-    pthread_mutex_unlock(&g_model_lock);
 
     return res;
 }
@@ -214,13 +200,11 @@ static int utime_callback(const char *path, struct utimbuf * time) {
 static void destroy_callback(void *priv_data) { 
     LOG_INFO("Received SIGTERM - cleaning up and exiting.");
     LOG_DEBUG("calling destroy chain");
-    pthread_mutex_lock(&g_model_lock);
     fsh_fusedataloader_destroy();
     int toFree;
     if((toFree = getAllocCounter())) {
         LOG_ERR("!!!!!!!!!! Not all memory have been freed - still left: %d !!!!!!!!!!!", toFree);
     }
-    pthread_mutex_unlock(&g_model_lock);
 }
 
 
