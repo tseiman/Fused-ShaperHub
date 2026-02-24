@@ -41,7 +41,7 @@ struct Fsh_ObjectStat_s {
 };
 
 
-int fsh_fusedataloader_dirLoader(struct Fsh_DirLoaderRef_s *ref);
+int fsh_fusedataloader_dirLoader(struct Fsh_DirLoaderRef_s *ref, int offset);
 int fsh_fusedataloader_statForPath(const char *path, struct stat *stbuf);
 int fsh_fusedataloader_linkInfo(const char *path, char * linkDstPath, size_t size);
 int fsh_fusedataloader_fileOpener(const char *path);

@@ -31,10 +31,12 @@
 #include <data-container.h>
 #include <http-connector.h>
 #include <open-file-manager.h>
+// #include <pthread.h>
 
 
 
 static PathInfo_t loadedJsonPathInfo = {NULL, NULL};
+// static pthread_mutex_t g_model_lock = PTHREAD_MUTEX_INITIALIZER;
 
 /* *********************************************************************** */
 /* *********************************************************************** */
@@ -52,12 +54,21 @@ int comparePathLevel(char *a, char *b) {
 /* *********************************************************************** */
 /* *********************************************************************** */
 PathInfo_t *updatePathInfo(const char *path) {
+
+
     
     MemoryStruct_t *httpResponseBuffer = NULL;
     json_error_t error;
     PathInfo_t *result = NULL;
 
     LOG_DEBUG("Entry with path >%s< ", path);
+
+
+
+
+    if (strncmp(path, "/AnotherFolder/AnotherFolder", MAX_PATH_LEN) == 0) { LOG_ERR("recursive folder !!!! >%s< ", path); exit(0); }
+
+
 
     if ((!path) && loadedJsonPathInfo.jsonObjectRoot && loadedJsonPathInfo.path)
         return &loadedJsonPathInfo; // if path is NULL but we've some info stored we return that
@@ -93,7 +104,7 @@ PathInfo_t *updatePathInfo(const char *path) {
         LOG_ERR("Invalid httpResponseBuffer size : %zd", httpResponseBuffer->size);
         goto ERROR;
     }
-    LOG_DEBUG(" httpResponseBuffer size : %s/%zd/%s", loadedJsonPathInfo.path, httpResponseBuffer->size, httpResponseBuffer->memory);
+    LOG_DEBUG(" httpResponseBuffer size : loadedJsonPathInfo=%s; httpResponseBuffer->size=%zd;  httpResponseBuffer->memory=%s", loadedJsonPathInfo.path, httpResponseBuffer->size, httpResponseBuffer->memory);
     if (!(loadedJsonPathInfo.jsonObjectRoot = json_loadb(httpResponseBuffer->memory, httpResponseBuffer->size, 0, &error))) {
         LOG_ERR("when loading JSON line:%d  error:%s ", error.line, error.text);
         goto ERROR;
@@ -182,7 +193,10 @@ json_t *getSubElementByNamedPath(char *path, json_t *root) {
 
 /* *********************************************************************** */
 /* *********************************************************************** */
-int fsh_datacontainer_loadDir(WalkFolders_Callback_t callback, struct Fsh_DirLoaderRef_s *ref) {
+int fsh_datacontainer_loadDir(WalkFolders_Callback_t callback, struct Fsh_DirLoaderRef_s *ref, int offset) {
+
+    int ret = 0; // return code
+  //  pthread_mutex_lock(&g_model_lock);
 
     LOG_DEBUG("Function entry with path >%s<", ref->path);
     PathInfo_t *pathInfo = NULL;
@@ -192,7 +206,8 @@ int fsh_datacontainer_loadDir(WalkFolders_Callback_t callback, struct Fsh_DirLoa
         pathInfo = updatePathInfo(ref->path);
     } else {
         char *tmpPath = MALLOC(pathLen + 1);
-        MEMCHK(tmpPath) return -1;
+        // MEMCHK(tmpPath) return -1;
+        MEMCHK(tmpPath) { ret = -1; goto EXIT; }
 
         strncpy(tmpPath,ref->path, pathLen + 1);
         tmpPath[pathLen] = '/';
@@ -205,7 +220,9 @@ int fsh_datacontainer_loadDir(WalkFolders_Callback_t callback, struct Fsh_DirLoa
 
     if (!pathInfo) {
         LOG_ERR("updatePathInfo( %s ) failed.", ref->path);
-        return -1;
+        // return -1;
+        ret = -1;
+        goto EXIT;
     }
     json_t *root = pathInfo->jsonObjectRoot;
     json_t *result_json;
@@ -213,14 +230,20 @@ int fsh_datacontainer_loadDir(WalkFolders_Callback_t callback, struct Fsh_DirLoa
 
     if (!root) {
         LOG_ERR("can't walk through folders if data is not loaded");
-        return -1;
+//        return -1;
+        ret = -1;
+        goto EXIT;
     }
 
     if (!json_is_array(root)) {
         LOG_WARN("having single element no Array");
     }
 
+
+    int idx = 0;
+
     json_array_foreach(root, i, result_json) {
+        if (idx < offset) { idx++; continue; }
 
         if (result_json && json_is_object(result_json)) {
             json_t *type = json_object_get(result_json, "type");
@@ -234,9 +257,13 @@ int fsh_datacontainer_loadDir(WalkFolders_Callback_t callback, struct Fsh_DirLoa
                 if(callback) callback(ref);
             }
         }
+        idx++;
     }  /* END looping trough the current listing */
 
-    return 0;
+EXIT:
+   // pthread_mutex_unlock(&g_model_lock);
+
+    return ret;
 }
 
 /*
@@ -251,10 +278,18 @@ int fsh_datacontainer_loadDir(WalkFolders_Callback_t callback, struct Fsh_DirLoa
 /* *********************************************************************** */
 json_t *getActualSubelement(const char *path) {
 
+  //  pthread_mutex_lock(&g_model_lock);
+
+   // pthread_mutex_trylock(&g_model_lock);
+
     size_t bufferLen = ALLOC_PATH_STRLEN(path);
     json_t *result_json = NULL;
-    char *tmpPath = MALLOC(bufferLen);
-    MEMCHK(tmpPath) return NULL;
+    char *tmpPath = MALLOC(bufferLen + 1);
+    MEMCHK(tmpPath) {
+  //      pthread_mutex_unlock(&g_model_lock);
+        return NULL;
+    }
+    memset(tmpPath, 0 ,bufferLen + 1);
     
     strncpy(tmpPath,path, bufferLen);
     for(int i = bufferLen - 1; i >= 0; --i) {
@@ -270,7 +305,8 @@ json_t *getActualSubelement(const char *path) {
 
     FREE(tmpPath);
  
- 
+     if (strncmp(path, "/AnotherFolder/AnotherFolder", MAX_PATH_LEN) == 0) { LOG_ERR("recursive folder !!!! >%s< ", path); exit(0); }
+
     if (!pathInfo) {
         LOG_ERR("updatePathInfo() Failed");
         result_json = NULL;
@@ -309,7 +345,7 @@ json_t *getActualSubelement(const char *path) {
 
 ERROR:
     
-
+  //  pthread_mutex_unlock(&g_model_lock);
     return result_json;
 }
 
@@ -318,55 +354,69 @@ ERROR:
 /* *********************************************************************** */
 int fsh_datacontainer_getInfo(const char *path, struct Fsh_ObjectStat_s *file_info) {
 
+    int ret = 0;
+   // pthread_mutex_lock(&g_model_lock);
+
     LOG_DEBUG("working on >%s<", path);
 
-    json_t * result_json = getActualSubelement(path);
-    if (!result_json) return -1;
+//    if (strncmp(path, "/AnotherFolder/AnotherFolder", MAX_PATH_LEN) == 0) { LOG_ERR("recursive folder !!!! >%s< ", path); exit(0); }
 
+
+    json_t * result_json = getActualSubelement(path);
+//    if (!result_json) return -1;
+    if (!result_json) {
+        LOG_DEBUG("Aworking on >%s<", path);
+        ret = -1;
+        goto EXIT;
+    }
     json_t *type = json_object_get(result_json, "type");
     json_t *atime = json_object_get(result_json, "created");
 
-
     if (type && json_is_string(type) && atime && json_is_string(atime)) {
-
             const char *timeStr = json_string_value(atime);
 
             struct tm parsedATime;
             memset(&parsedATime, 0, sizeof(parsedATime));
             strptime(timeStr, "%FT%T%z", &parsedATime);
             file_info->atime = mktime(&parsedATime);
-
             file_info->filesize = 0;
             LOG_DEBUG("path: %s, type: %s", path, json_string_value(type));
 
 
             const char *t = json_string_value(type);
-
             if(t == NULL) {
                 LOG_ERR("JSON type not set");
-                return -101;
+               // return -101;
+                ret = -102;
+                goto EXIT;
             }
 
             if (strncmp(t, "folder",6) == 0) {
                 file_info->type = FSH_STAT_TYPE_FOLDER;
             } else if (strncmp(t, "file",4) == 0) {
-
                 json_t *filesize = json_object_get(result_json, "size");
                 if (filesize && json_is_integer(filesize)) {
                     file_info->type = FSH_STAT_TYPE_FILE;
                     file_info->filesize = json_integer_value(filesize);
                 } else {
                     LOG_ERR("File object did not contain size information");
-                    return -101;
+//                    return -101;
+                    ret = -102;
+                    goto EXIT;
+
                 }
 
             } else {
                 LOG_WARN("Unknown file type");
-                return -100;
+//                return -100;
+                ret = -100;
+                goto EXIT;
             }
         }
   
-    return 0;
+  EXIT:
+  //  pthread_mutex_unlock(&g_model_lock);
+    return ret;
 }
 
 
@@ -376,17 +426,22 @@ int fsh_datacontainer_getInfo(const char *path, struct Fsh_ObjectStat_s *file_in
 /* *********************************************************************** */
 int fsh_datacontainer_openFile(const char *newPath) {
     int result = -1;
-
+   // pthread_mutex_lock(&g_model_lock);
    
     LOG_INFO("Opening file >%s< ", newPath);
 
     json_t * result_json = getActualSubelement(newPath);
-    if (!result_json) return -1;
+    if (!result_json) {
+        result = -1;
+        goto ERROR;
+    }
 
     json_t *blob = json_object_get(result_json, "blob");
  
-    if (!(blob && json_is_string(blob))) return -2;
-    
+    if (!(blob && json_is_string(blob))) {
+        result = -2;
+        goto ERROR;
+    }
 
     const char *newBlobID = json_string_value(blob);
     LOG_DEBUG("Extracted a blob from curent Folder Structure data:  >%s<", newBlobID);
@@ -395,22 +450,28 @@ int fsh_datacontainer_openFile(const char *newPath) {
 
     if(fsh_openfilemanager_getFileContext(newPath)) {
         LOG_DEBUG("File already opened: >%s<", newPath);
-        return 0;
+        result=0;
+        goto EXIT;
     }
 
 
     FileMemoryStruct_t *file = fsh_openfilemanager_openFile(newPath,newBlobID);
 
-    if(!file) goto ERROR;
-
-    if (fsh_httpconnector_OpenFile(file->blobID, &file->memory)) {
-        LOG_ERR("fsh_httpconnector_OpenFile() failed");
+    if(!file) {
+        result = -3;
         goto ERROR;
     }
 
-ERROR:
-    return result;
+    if (fsh_httpconnector_OpenFile(file->blobID, &file->memory)) {
+        LOG_ERR("fsh_httpconnector_OpenFile() failed");
+        result = -4;
+        goto ERROR;
+    }
 
+EXIT:
+ERROR:
+ //   pthread_mutex_unlock(&g_model_lock);
+    return result;
 }
 
 
@@ -418,18 +479,19 @@ ERROR:
 /* *********************************************************************** */
 /* *********************************************************************** */
 FileMemoryStruct_t *fsh_datacontainer_readFile(const char *newPath) {
+ //   pthread_mutex_lock(&g_model_lock);
 
-   FileMemoryStruct_t *result = NULL;
+    FileMemoryStruct_t *result = NULL;
 
    
     LOG_DEBUG("read file >%s< ", newPath);
 
     json_t * result_json = getActualSubelement(newPath);
-    if (!result_json) return result;
+    if (!result_json) goto EXIT;
 
     json_t *blob = json_object_get(result_json, "blob");
  
-    if (!(blob && json_is_string(blob))) return result;
+    if (!(blob && json_is_string(blob))) goto EXIT;
     
 
     const char *newBlobID = json_string_value(blob);
@@ -442,16 +504,20 @@ FileMemoryStruct_t *fsh_datacontainer_readFile(const char *newPath) {
         LOG_ERR("fsh_openfilemanager_getFileContext returned in an error condition ! : >%s<", newPath);
 
         file = fsh_openfilemanager_openFile(newPath,newBlobID);
-        if(retryCounter > 2) return result;  
+        result = file;
+        if(retryCounter > 2) goto EXIT;
         ++retryCounter;
     }
 
-    if( newBlobID && (strncmp(newBlobID,file->blobID,BLOB_ID_LEN) != 0)) { 
+    if( newBlobID && (strncmp(newBlobID,result->blobID,BLOB_ID_LEN) != 0)) { 
         LOG_ERR("File was not opnend !!!!!: >%s<", newPath);
-        return result;
+        goto EXIT;
     }
 
-    return file;
+  //  return file;
+EXIT:
+  //  pthread_mutex_unlock(&g_model_lock);
+    return result;
 }
 /* *********************************************************************** */
 /* *********************************************************************** */

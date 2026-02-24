@@ -13,7 +13,7 @@
  ************************************************************************** */
 #include <stdio.h>
 
-
+#include <pthread.h>
 
 #ifdef _WIN32
 #define PATH_SEPARATOR '\\'
@@ -46,6 +46,9 @@
 #ifndef MAX_PATH_LEN
   #define MAX_PATH_LEN PATH_MAX
 #endif
+
+static pthread_mutex_t g_model_lock = PTHREAD_MUTEX_INITIALIZER;
+
 
 
 

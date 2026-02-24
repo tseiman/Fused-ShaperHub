@@ -35,7 +35,7 @@ size_t  openFiles = 0;
 
 FileMemoryStruct_t *fsh_openfilemanager_getFileContext(const char * path);
 
-pthread_mutex_t mutexLock = PTHREAD_MUTEX_INITIALIZER;
+// pthread_mutex_t mutexLock = PTHREAD_MUTEX_INITIALIZER;
 
 FileMemoryStruct_t *fsh_openfilemanager_openFile(const char * path, const char * newBlobID) {
     
@@ -46,7 +46,8 @@ FileMemoryStruct_t *fsh_openfilemanager_openFile(const char * path, const char *
         return fileCtx;
     }
 
-    pthread_mutex_lock(&mutexLock);    
+   // pthread_mutex_lock(&mutexLock);    
+// XX       pthread_mutex_lock(&g_model_lock);    
 
     ++openFiles;
     LOG_DEBUG("Register open file >%s<. Open are >%zu< now.", path, openFiles);
@@ -79,7 +80,7 @@ ERROR:
     FREE(openedFile);
 EXIT:
 
-    pthread_mutex_unlock(&mutexLock);
+ // XX   pthread_mutex_unlock(&g_model_lock);
     return result;
 }
 
@@ -87,7 +88,7 @@ EXIT:
 FileMemoryStruct_t *fsh_openfilemanager_getFileContext(const char * path) {
     OpenFileList_t *fileInList = firstOpenFile;
 
-    pthread_mutex_lock(&mutexLock);
+ // XX   pthread_mutex_lock(&g_model_lock);
 
     while(fileInList) {
 //       if(fileInList->path[0] != '\0') {
@@ -99,7 +100,7 @@ FileMemoryStruct_t *fsh_openfilemanager_getFileContext(const char * path) {
 
             if(fileInList && (strncmp(path, fileInList->path, pathLen > fileInList->pathLen ? fileInList->pathLen : pathLen ) == 0)) {
                 LOG_DEBUG("Found file OPEN >%s<",path);
-                pthread_mutex_unlock(&mutexLock);
+          // XX      pthread_mutex_unlock(&g_model_lock);
                 return fileInList->file;
             }
         }
@@ -107,7 +108,7 @@ FileMemoryStruct_t *fsh_openfilemanager_getFileContext(const char * path) {
     }
 
     LOG_DEBUG("File wasn't opened negative result >%s<",path);
-    pthread_mutex_unlock(&mutexLock);
+    // XX pthread_mutex_unlock(&g_model_lock);
     return NULL;
 }
 
@@ -119,7 +120,7 @@ int fsh_openfilemanager_closeFile(const char * path) {
 
     LOG_DEBUG("Attempt to close file >%s<", path);
 
-    pthread_mutex_lock(&mutexLock);
+  // XX  pthread_mutex_lock(&g_model_lock);
 
     while(fileInList) {
         OpenFileList_t *tmpFileInListNext = fileInList->next;
@@ -166,7 +167,7 @@ int fsh_openfilemanager_closeFile(const char * path) {
 
 EXIT:
  
-    pthread_mutex_unlock(&mutexLock);
+  // XX  pthread_mutex_unlock(&g_model_lock);
     return result;
 }
 
@@ -175,7 +176,7 @@ EXIT:
 void fsh_openfilemanager_closeAllFiles(void) {
     OpenFileList_t *fileInList = firstOpenFile;
 
-    pthread_mutex_lock(&mutexLock);
+// XX    pthread_mutex_lock(&g_model_lock);
 
     while(fileInList) {
         OpenFileList_t *tmpFileInListNext = fileInList->next;
@@ -196,6 +197,6 @@ void fsh_openfilemanager_closeAllFiles(void) {
         LOG_INFO("Closed all files"); 
     }
 
-    pthread_mutex_unlock(&mutexLock);
+   // XX pthread_mutex_unlock(&g_model_lock);
 }
 

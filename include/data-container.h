@@ -42,7 +42,7 @@ typedef struct  {
 
 
 // int fsh_setupDataStructure(void);
-int fsh_datacontainer_loadDir(WalkFolders_Callback_t callback, struct Fsh_DirLoaderRef_s *ref);
+int fsh_datacontainer_loadDir(WalkFolders_Callback_t callback, struct Fsh_DirLoaderRef_s *ref, int offset);
 int fsh_datacontainer_getInfo(const char *path,struct Fsh_ObjectStat_s *file_info);
 int fsh_datacontainer_openFile(const char *newPath);
 FileMemoryStruct_t *fsh_datacontainer_readFile(const char *newPath);

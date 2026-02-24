@@ -33,8 +33,8 @@ int fsh_dirLoaderCallback(struct Fsh_DirLoaderRef_s *ref) {
 }
 
 
-int fsh_fusedataloader_dirLoader(struct Fsh_DirLoaderRef_s *ref) {
-    fsh_datacontainer_loadDir(fsh_dirLoaderCallback, ref);
+int fsh_fusedataloader_dirLoader(struct Fsh_DirLoaderRef_s *ref, int offset) {
+    fsh_datacontainer_loadDir(fsh_dirLoaderCallback, ref, offset);
 	return 0;
 }
 
