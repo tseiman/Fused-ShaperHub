@@ -12,7 +12,6 @@
  *
  ************************************************************************** */
 #include <stdio.h>
-
 #include <pthread.h>
 
 #ifdef _WIN32
@@ -23,7 +22,7 @@
 
 #define MAX_PATH_LEN 1024
 
-#ifndef TRUE 
+#ifndef TRUE
 #define TRUE  (1==1)
 #endif
 
@@ -31,25 +30,25 @@
 #define FALSE (!TRUE)
 #endif
 
-
 #include <limits.h>
 
 #ifdef __APPLE__
-  #include <sys/syslimits.h>   // PATH_MAX auf macOS zuverlässig
+  #include <sys/syslimits.h>
 #endif
 
 #ifndef PATH_MAX
-  #define PATH_MAX 4096        // Fallback (sicherer Default)
+  #define PATH_MAX 4096
 #endif
 
-// Dein Projekt-Makro:
 #ifndef MAX_PATH_LEN
   #define MAX_PATH_LEN PATH_MAX
 #endif
 
-/* g_model_lock removed: open-file-manager uses its own internal mutex (ofm_lock).
- * No shared mutex is needed at this layer. */
-
-
-
-
+/* NOTE: g_model_lock removed.
+ * The old 'static pthread_mutex_t g_model_lock' here was broken: 'static'
+ * in a header gives every .c file its own private copy, so threads were
+ * locking different mutex instances and not protecting each other at all.
+ *
+ * Locking is now handled per-subsystem:
+ *   - JSON path cache: thread-local storage (pthread_key_t) in data-container.c
+ *   - Open file list:  internal ofm_lock in open-file-manager.c              */

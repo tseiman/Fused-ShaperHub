@@ -50,35 +50,34 @@ size_t escapeURL(char * buffer, char **newBufferIn, size_t len) {
     size_t newSize = len + 1;
     int newOffset = 0;
 
-    char *newBuffer = MALLOC(len);                              // we have to copy the original buffer to the new. 
-                                                                // Some characters are expanded to %XX (Hex) 
-                                                                // - so initially the new buffer is minimum that long than old 
-                                                                
+    char *newBuffer = MALLOC(newSize);
     MEMCHK(newBuffer) return 0;
 
-    for(int i; i <= newSize + 1; ++i) {
-        if(URLEncodingLookup[buffer[i]]) {
+    /* FIX: i was uninitialized - for(int i; ...) gives i a random start value.
+     * This caused the loop to start at a garbage offset, producing an empty or
+     * corrupt escaped URL. The server then received only the base URL and
+     * returned the root listing, which was cached under the wrong path key,
+     * causing the /AnotherFolder/AnotherFolder/... infinite recursion.        */
+    for (int i = 0; i <= (int)len; ++i) {
+        if (buffer[i] == '\0') {
+            newBuffer[i + newOffset] = '\0';
+            break;
+        }
+        if (URLEncodingLookup[(unsigned char)buffer[i]]) {
             newBuffer[i + newOffset] = buffer[i];
         } else {
-            if(buffer[i] == '\0') {
-                newBuffer[i + newOffset]  = buffer[i];
-                break;
-            }
             newSize += 3;
-            
             char *tmpBuffer = REALLOC(newBuffer, newSize);
-            if(!tmpBuffer) {
+            if (!tmpBuffer) {
                 FREE(newBuffer);
                 newBuffer = NULL;
                 return 0;
             }
             newBuffer = tmpBuffer;
-
-            sprintf(newBuffer + i + newOffset, "%%%02X",buffer[i]);
+            sprintf(newBuffer + i + newOffset, "%%%02X", (unsigned char)buffer[i]);
             newOffset += 2;
-
         }
-    } 
+    }
     *newBufferIn = newBuffer;
     return newSize;
 }
@@ -271,6 +270,4 @@ EXIT:
     FREE(pathbuffer);
     return result;
 }
-
-
 

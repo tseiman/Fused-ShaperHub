@@ -19,6 +19,11 @@
 #ifndef ALLOC_H
 #define ALLOC_H
 
+#ifndef MEMWRAP_INTERNAL
+#pragma GCC poison malloc calloc realloc free
+#endif
+
+
 #define MALLOC(size) gcp_malloc(__FUNCTION__, size, __FILE_NAME__, __LINE__)
 #define REALLOC(p,size) gcp_realloc(__FUNCTION__, p, size, __FILE_NAME__, __LINE__)
 #define FREE(p) gcp_free(__FUNCTION__, p, __FILE_NAME__, __LINE__)
