@@ -1,6 +1,6 @@
 /* ***************************************************************************
  *
- * Thomas Schmidt, 2020, 2024
+ * Thomas Schmidt, 2020-2026
  *
  * This file is part of the Fused ShaperHub Project
  *

@@ -1,6 +1,6 @@
 /* ***************************************************************************
  *
- * Thomas Schmidt, 2020
+ * Thomas Schmidt, 2020-2026
  *
  * This file is part of the MountOctave Demonstrator Project
  *
@@ -40,12 +40,12 @@
  *   Thread A's json_t* now points at wrong JSON tree -> AnotherFolder found
  *   as child of /AnotherFolder/ -> /AnotherFolder/AnotherFolder/... loop.
  *
- * PROBLEM 2: Even with TLS, getActualSubelement() returned a raw json_t*
- *   pointing INTO the TLS cache. Any subsequent updatePathInfo() call in
+ * PROBLEM 2: Even with TLS (Thread-Local Storage), getActualSubelement() returned a raw json_t*
+ *   pointing INTO the TLS (Thread-Local Storage) cache. Any subsequent updatePathInfo() call in
  *   the same thread replaces the cache, json_decref's the old tree, and
  *   the caller's pointer becomes a use-after-free -> same corruption.
  *
- * FIX 1: pthread_key_t TLS - each thread has its own PathInfo_t cache.
+ * FIX 1: pthread_key_t TLS (Thread-Local Storage) - each thread has its own PathInfo_t cache.
  *
  * FIX 2: getActualSubelement() calls json_incref() before returning.
  *   The CALLER owns the reference and MUST call json_decref() when done.

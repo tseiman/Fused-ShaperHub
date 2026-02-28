@@ -5,7 +5,7 @@
  * messages.h is part of the project: FILLME 
  * Project Page: https://github.com/tseiman/
  * Author: Thomas Schmidt
- * Copyright (c) 2024 
+ * Copyright (c) 2024-2026
  *
  * Description:
  *

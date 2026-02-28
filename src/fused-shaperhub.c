@@ -68,7 +68,7 @@ static int getattr_callback(const char *path, struct stat *stbuf) {
     memset(stbuf, 0, sizeof(struct stat));
 
     if (strncmp(path, "/", MAX_PATH_LEN) == 0) {
-        stbuf->st_mode = S_IFDIR | 0755;
+        stbuf->st_mode = S_IFDIR | 0775;
         stbuf->st_nlink = 1;
         stbuf->st_atime = stbuf->st_mtime = stbuf->st_ctime = time(NULL);
         return 0;
@@ -81,15 +81,6 @@ static int getattr_callback(const char *path, struct stat *stbuf) {
 
     return 0;
 }
-
-
-static int setattr_callback(const char * path, const char *name, const char *value, size_t size,  int flags) { 
-    
-    LOG_DEBUG("setattr_callback path:%s, name:%s, value:%s, size:%zu, flags: %d",path,name,value , size, flags);
-    UNIMPLEMENTED("setattr callback not implemented yet");
-    return 0;
-}
-
 
 
 static int readdir_callback(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi) {
@@ -114,21 +105,12 @@ static int readdir_callback(const char *path, void *buf, fuse_fill_dir_t filler,
     return -ENOENT;
 }
 
-static int create_callback(const char *path, mode_t mode, struct fuse_file_info *fi) {
-    LOG_DEBUG("create_callback");
-    UNIMPLEMENTED("create callback not implemented yet");
-    return 0;
-}
 
 static int mknod_callback(const char *path, mode_t mode, dev_t rdev) {
     LOG_DEBUG("mknod_callback");
-
     int res = fsh_fusedataloader_mknod(path);
-
     return res;
 }
-
-
 
 
 static int open_callback(const char *path, struct fuse_file_info *fi) { 
@@ -150,12 +132,13 @@ static int write_callback(const char *path, const char *buf, size_t size, off_t 
     UNIMPLEMENTED("write callback not implemented yet");
     return size;  
 }
+/*
 static int write_buf_callback(const char *path, struct fuse_bufvec *buf, off_t offset, struct fuse_file_info *fi) {
     LOG_DEBUG("write_buf_callback");
     UNIMPLEMENTED("write_buff callback not implemented yet");
     return 0; 
 }
-
+*/
 static int truncate_callback(const char *path, off_t offset) { 
     LOG_DEBUG("truncate_callback");
     UNIMPLEMENTED("truncate callback not implemented yet");;
@@ -172,30 +155,9 @@ static int release_callback(const char *path, struct fuse_file_info *fi) {
     return res;
 }
 
-static int flush_callback(const char *path, struct fuse_file_info *fi) { 
-    LOG_DEBUG("flush_callback");
-    UNIMPLEMENTED("flush callback not implemented yet");
-    return 0;  
-}
-static int fsync_callback(const char *path, int datasync, struct fuse_file_info *fi) {
-    LOG_DEBUG("fsync_callback");
-    UNIMPLEMENTED("fsync callback not implemented yet");
-    return 0;  
-}
 
-
-static int chmod_callback(const char *path, mode_t mode) { return 0; } /* We do not do anything here - seems some editors like to fo chmod without "operation not permitted" */
-static int chown_callback(const char *path, uid_t uid, gid_t gid) {
-    LOG_DEBUG("chown_callback");
-    UNIMPLEMENTED("chown callback not implemented yet");
-    return 0;  
-}
-
-static int utime_callback(const char *path, struct utimbuf * time) {
-    LOG_DEBUG("utime_callback");
-    UNIMPLEMENTED("utime callback not implemented yet");
-    return 0;  
-}
+// empty - will not set time to cloud
+static int utime_callback(const char *path, struct utimbuf * time) { return 0;  }
 
 static void destroy_callback(void *priv_data) { 
     LOG_INFO("Received SIGTERM - cleaning up and exiting.");
@@ -210,27 +172,17 @@ static void destroy_callback(void *priv_data) {
 
 
 static struct fuse_operations mount_fsh_operations = {
-  //  .init       = init_callback,
     .mkdir      = mkdir_callback,
- //   .rmdir      = rmdir_callback,
-  //  .rename     = rename_callback,
     .getattr    = getattr_callback,
     .readdir    = readdir_callback,
-        .mknod    = mknod_callback,
- //   .create     = create_callback,
+    .rename     = rename_callback,
     .open       = open_callback,
     .read       = read_callback,
     .write      = write_callback,
-//    .write_buf  = write_buf_callback,
     .release    = release_callback,
- //   .flush      = flush_callback,
- //   .fsync      = fsync_callback,
     .destroy    = destroy_callback,
-  .chmod = chmod_callback,
-//  .chown = chown_callback,
-//  .utime = utime_callback, 
-//  .truncate = truncate_callback, // << this would be needed for online editing
-//  .setxattr = setattr_callback,
+    .utime      = utime_callback,
+    .truncate   = truncate_callback, // << this would be needed for online editing
 };
 
 

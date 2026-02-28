@@ -1,6 +1,6 @@
 /* ***************************************************************************
  *
- * Thomas Schmidt, 2020
+ * Thomas Schmidt, 2020-2026
  *
  * This file is part of the MountOctave Demonstrator Project
  *
@@ -89,14 +89,14 @@ int fsh_fusedataloader_statForPath(const char *path, struct stat *stbuf) {
     switch(file_info.type) {
 	case FSH_STAT_TYPE_FOLDER:
 	    LOG_DEBUG("FOLDER with name added: %s",path);
-	    stbuf->st_mode = S_IFDIR | 0755;
+	    stbuf->st_mode = S_IFDIR | 0775;
 	    stbuf->st_nlink = 2;
 	    stbuf->st_size = 4096;
 	    stbuf->st_atime = stbuf->st_mtime = stbuf->st_ctime = file_info.atime;
 	    break;
 	case FSH_STAT_TYPE_FILE:
 	    LOG_DEBUG("FILE with name added: %s",path);
-	    stbuf->st_mode = S_IFREG | 0644;
+	    stbuf->st_mode = S_IFREG | 0664;
 	    stbuf->st_nlink = 1;
 	    stbuf->st_size = file_info.filesize;
 	    stbuf->st_atime = stbuf->st_mtime = stbuf->st_ctime = file_info.atime;
